@@ -19,6 +19,7 @@ spec:
       valuesObject:
         args:
           - --kubelet-insecure-tls
+          - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
 
   destination:
     server: https://kubernetes.default.svc
