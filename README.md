@@ -7,7 +7,6 @@ flannel-backend: none
 disable-network-policy: true
 disable:
   - traefik
-  - servicelb
 # 기본 설치 과정 이후, 설정 파일 수정
 ```
 
