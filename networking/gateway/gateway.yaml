@@ -1,0 +1,45 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: http
+  namespace: infra
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-cloudflare
+spec:
+  gatewayClassName: cilium
+
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
+
+    - name: sqr-kr-apex-https
+      protocol: HTTPS
+      port: 443
+      hostname: sqr.kr
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: sqr-kr-apex-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+
+    - name: sqr-kr-wildcard-https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.sqr.kr"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: sqr-kr-wildcard-tls
+      allowedRoutes:
+        namespaces:
+          from: All

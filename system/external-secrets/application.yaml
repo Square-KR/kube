@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: system
+    app.kubernetes.io/component: secrets-management
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - chart: external-secrets
+      repoURL: https://charts.external-secrets.io
+      targetRevision: 0.20.1
+      helm:
+        valuesObject:
+          webhook:
+            certManager:
+              enabled: true
+              cert:
+                issuerRef:
+                  kind: ClusterIssuer
+                  name: self-signed
+
+    - repoURL: https://github.com/Square-KR/kube
+      targetRevision: HEAD
+      path: system/external-secrets
+      directory:
+        exclude: application.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

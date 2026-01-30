@@ -1,0 +1,28 @@
+global:
+  domain: argocd.sqr.kr
+
+configs:
+  cm:
+    resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret:
+      |
+      jqPathExpressions:
+        - .spec.data[].remoteRef | .conversionStrategy, .decodingStrategy, .metadataPolicy
+        - .spec.dataFrom[].find | .conversionStrategy, .decodingStrategy
+
+server:
+  ingress:
+    enabled: true
+    ingressClassName: cilium
+
+    annotations:
+      ingress.cilium.io/tls-passthrough: enabled
+      ingress.cilium.io/force-https: enabled
+
+    tls: true
+
+  certificate:
+    enabled: true
+    issuer:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: letsencrypt

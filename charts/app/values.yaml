@@ -1,0 +1,26 @@
+nameOverride: ""
+fullnameOverride: ""
+
+replicas: 1
+
+image:
+  name: ""
+  version: latest
+
+resources:
+  cpu: "100m"
+  memory: "128Mi"
+
+env: []
+
+secrets: []
+
+hpa:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 50
+
+pdb:
+  enabled: false
+  minAvailable: "50%"

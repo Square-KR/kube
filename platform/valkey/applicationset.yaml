@@ -1,0 +1,144 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: valkey
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: platform
+    app.kubernetes.io/component: cache
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - list:
+        elements:
+          - env: dev
+            redis:
+              maxmemory: 256mb
+            replicas: 1
+            resources:
+              cpu: 200m
+              memory: 512Mi
+            storage:
+              size: 10Gi
+
+          - env: prod
+            redis:
+              maxmemory: 1536mb
+            replicas: 3
+            resources:
+              cpu: 500m
+              memory: 2Gi
+            storage:
+              size: 20Gi
+
+  template:
+    metadata:
+      name: valkey-{{.env}}
+      labels:
+        app.kubernetes.io/part-of: platform
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/instance: "{{.env}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+
+      source:
+        chart: valkey
+        repoURL: https://charts.bitnami.com/bitnami
+        targetRevision: 3.0.31
+        helm:
+          releaseName: valkey
+          parameters:
+            - name: replica.replicaCount
+              value: "{{.replicas}}"
+          valuesObject:
+            architecture: replication
+
+            commonConfiguration: |
+              maxmemory {{.redis.maxmemory}}
+              maxmemory-policy noeviction
+
+              appendonly yes
+              appendfsync everysec
+
+              save ""
+
+            useHostnames: false
+
+            image:
+              repository: bitnamilegacy/valkey
+
+            auth:
+              enabled: false
+
+            sentinel:
+              enabled: true
+              primarySet: primary
+              image:
+                repository: bitnamilegacy/valkey-sentinel
+              resources:
+                requests:
+                  cpu: 100m
+                limits:
+                  memory: 256Mi
+              service: {}
+
+            primary:
+              replicaCount: 1
+              resources:
+                requests:
+                  cpu: "{{.resources.cpu}}"
+                limits:
+                  memory: "{{.resources.memory}}"
+              persistence:
+                storageClass: local-path
+                size: "{{.storage.size}}"
+              topologySpreadConstraints:
+                - maxSkew: 1
+                  topologyKey: kubernetes.io/hostname
+                  whenUnsatisfiable: DoNotSchedule
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: valkey
+
+            replica:
+              resources:
+                requests:
+                  cpu: "{{.resources.cpu}}"
+                limits:
+                  memory: "{{.resources.memory}}"
+              persistence:
+                storageClass: local-path
+                size: "{{.storage.size}}"
+              topologySpreadConstraints:
+                - maxSkew: 1
+                  topologyKey: kubernetes.io/hostname
+                  whenUnsatisfiable: DoNotSchedule
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: valkey
+
+            volumePermissions:
+              image:
+                repository: bitnamilegacy/os-shell
+
+            kubectl:
+              image:
+                repository: bitnamilegacy/kubectl
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.env}}"
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - CreateNamespace=true
