@@ -8,21 +8,13 @@ configs:
       jqPathExpressions:
         - .spec.data[].remoteRef | .conversionStrategy, .decodingStrategy, .metadataPolicy
         - .spec.dataFrom[].find | .conversionStrategy, .decodingStrategy
+  params:
+    server.insecure: true
 
 server:
-  ingress:
+  httproute:
     enabled: true
-    ingressClassName: cilium
-
-    annotations:
-      ingress.cilium.io/tls-passthrough: enabled
-      ingress.cilium.io/force-https: enabled
-
-    tls: true
-
-  certificate:
-    enabled: true
-    issuer:
-      group: cert-manager.io
-      kind: ClusterIssuer
-      name: letsencrypt
+    parentRefs:
+      - name: http
+        namespace: infra
+        sectionName: sqr-kr-wildcard-https
