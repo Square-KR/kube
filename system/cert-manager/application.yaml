@@ -6,6 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/part-of: system
     app.kubernetes.io/component: certificate-management
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
