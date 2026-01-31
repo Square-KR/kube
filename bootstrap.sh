@@ -15,9 +15,15 @@ error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 command -v kubectl >/dev/null 2>&1 || error "kubectl not found"
 command -v helmfile >/dev/null 2>&1 || error "helmfile not found"
 
-# Check DOPPLER_TOKEN
-if [[ -z "${DOPPLER_TOKEN:-}" ]]; then
-  error "DOPPLER_TOKEN environment variable is required"
+# Check Doppler tokens
+if [[ -z "${DOPPLER_TOKEN_INFRA:-}" ]]; then
+  error "DOPPLER_TOKEN_INFRA environment variable is required"
+fi
+if [[ -z "${DOPPLER_TOKEN_DEV:-}" ]]; then
+  error "DOPPLER_TOKEN_DEV environment variable is required"
+fi
+if [[ -z "${DOPPLER_TOKEN_PROD:-}" ]]; then
+  error "DOPPLER_TOKEN_PROD environment variable is required"
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,11 +43,21 @@ helmfile apply --file "$SCRIPT_DIR/bootstrap/argocd/helmfile.yaml" --quiet
 log "Waiting for ArgoCD to be ready..."
 kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
 
-# 3. Create Doppler token secret
-log "Creating Doppler token secret..."
+# 3. Create Doppler token secrets
+log "Creating Doppler token secrets..."
 kubectl create secret generic doppler-token-infrastructure \
   --namespace kube-system \
-  --from-literal=token="$DOPPLER_TOKEN" \
+  --from-literal=token="$DOPPLER_TOKEN_INFRA" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic doppler-token-dev \
+  --namespace kube-system \
+  --from-literal=token="$DOPPLER_TOKEN_DEV" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic doppler-token-prod \
+  --namespace kube-system \
+  --from-literal=token="$DOPPLER_TOKEN_PROD" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # 4. Apply root application
