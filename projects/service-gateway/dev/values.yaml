@@ -2,6 +2,10 @@ image:
   name: ghcr.io/square-kr/service-gateway
   version: latest
 
+resources:
+  cpu: "250m"
+  memory: "512Mi"
+
 secrets:
   - service-gateway
 

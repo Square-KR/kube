@@ -4,7 +4,7 @@ image:
 
 resources:
   cpu: "250m"
-  memory: "256Mi"
+  memory: "1Gi"
 
 secrets:
   - service-gateway
