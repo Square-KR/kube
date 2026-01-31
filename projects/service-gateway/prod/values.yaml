@@ -9,6 +9,9 @@ resources:
 secrets:
   - service-gateway
 
+imagePullSecrets:
+  - ghcr-pull-secret
+
 hpa:
   enabled: true
   minReplicas: 1

@@ -20,6 +20,12 @@ spec:
       labels:
         {{- include "app.labels" . | nindent 8 }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
       containers:
         - name: app
           image: "{{ .Values.image.name }}:{{ .Values.image.version }}"

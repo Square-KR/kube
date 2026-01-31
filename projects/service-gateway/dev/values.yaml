@@ -4,3 +4,6 @@ image:
 
 secrets:
   - service-gateway
+
+imagePullSecrets:
+  - ghcr-pull-secret
