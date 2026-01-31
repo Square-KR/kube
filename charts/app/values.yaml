@@ -3,6 +3,8 @@ fullnameOverride: ""
 
 replicas: 1
 
+port: 3000
+
 image:
   name: ""
   version: latest

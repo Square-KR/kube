@@ -32,7 +32,7 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: LISTEN_PORT
-              value: "3000"
+              value: {{ .Values.port | quote }}
             - name: HOST_IP
               valueFrom:
                 fieldRef:
@@ -57,7 +57,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz/liveness
-              port: 3000
+              port: {{ .Values.port }}
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
@@ -65,7 +65,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /healthz/readiness
-              port: 3000
+              port: {{ .Values.port }}
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
