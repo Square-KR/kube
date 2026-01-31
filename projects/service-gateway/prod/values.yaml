@@ -5,7 +5,7 @@ healthCheck:
   readiness: /actuator/health/readiness
 image:
   name: ghcr.io/square-kr/service-gateway
-  version: "a9b6b5e1"
+  version: "bc342d42"
 resources:
   cpu: "250m"
   memory: "1Gi"
