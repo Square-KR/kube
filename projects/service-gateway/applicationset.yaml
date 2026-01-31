@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: service-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: projects
+    app.kubernetes.io/component: api-gateway
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - list:
+        elements:
+          - env: dev
+          - env: prod
+
+  template:
+    metadata:
+      name: service-gateway-{{.env}}
+      labels:
+        app.kubernetes.io/part-of: projects
+        app.kubernetes.io/component: api-gateway
+        app.kubernetes.io/instance: "{{.env}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+
+      sources:
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          ref: repo
+
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          path: charts/app
+          helm:
+            releaseName: service-gateway
+            valueFiles:
+              - $repo/projects/service-gateway/{{.env}}/values.yaml
+
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          path: projects/service-gateway/{{.env}}
+          directory:
+            exclude: values.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.env}}"
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - CreateNamespace=true
