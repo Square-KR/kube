@@ -23,3 +23,7 @@ sudo systemctl disable --now firewalld
 helm plugin install https://github.com/databus23/helm-diff
 # helm 파일 diff 비교 플러그인 설치
 ```
+
+## LB 세팅
+
+- NLB "소스 IP 보존" 비활성화 필수 -> 어차피 Cloudflare Proxied 상태 시, 헤더에 IP를 내려주기 때문에 필요 X
