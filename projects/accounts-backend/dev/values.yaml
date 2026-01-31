@@ -1,4 +1,4 @@
-port: 8080
+port: 8081
 healthCheck:
   port: 9090
   liveness: /actuator/health/liveness
