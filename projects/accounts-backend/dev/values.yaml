@@ -1,20 +1,15 @@
 port: 8080
-
 healthCheck:
   port: 9090
   liveness: /actuator/health/liveness
   readiness: /actuator/health/readiness
-
 image:
   name: ghcr.io/square-kr/accounts-backend
-  version: latest
-
+  version: 744b41cf
 resources:
   cpu: "250m"
   memory: "512Mi"
-
 secrets:
   - accounts-backend
-
 imagePullSecrets:
   - ghcr-pull-secret
