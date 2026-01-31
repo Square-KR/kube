@@ -56,16 +56,16 @@ spec:
               memory: {{ .Values.resources.memory }}
           livenessProbe:
             httpGet:
-              path: /healthz/liveness
-              port: {{ .Values.port }}
+              path: {{ .Values.healthCheck.liveness }}
+              port: {{ .Values.healthCheck.port | default .Values.port }}
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 6
           readinessProbe:
             httpGet:
-              path: /healthz/readiness
-              port: {{ .Values.port }}
+              path: {{ .Values.healthCheck.readiness }}
+              port: {{ .Values.healthCheck.port | default .Values.port }}
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1

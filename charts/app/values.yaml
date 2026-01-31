@@ -5,6 +5,11 @@ replicas: 1
 
 port: 3000
 
+healthCheck:
+  port: ""
+  liveness: /healthz/liveness
+  readiness: /healthz/readiness
+
 image:
   name: ""
   version: latest
