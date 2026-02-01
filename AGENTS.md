@@ -16,6 +16,7 @@ ArgoCD-managed Kubernetes GitOps monorepo for Square-KR microservices. Cilium CN
 ├── system/             # Core: cert-manager, external-secrets, argo-rollouts, reloader
 ├── networking/         # Gateway API (Cilium) + HTTPRoutes
 ├── platform/           # Data layer: Valkey (Redis)
+├── observability/      # Monitoring: Datadog agent
 ├── projects/           # Microservices: accounts-backend, service-gateway
 ├── charts/app/         # Generic Helm chart for all workloads
 ├── root.yaml           # ArgoCD App-of-Apps entry point
@@ -31,6 +32,7 @@ ArgoCD-managed Kubernetes GitOps monorepo for Square-KR microservices. Cilium CN
 | Add system component | `system/{name}/` | Create application.yaml |
 | Configure secrets | `system/external-secrets/` | Doppler SecretStores |
 | Update gateway/routes | `networking/gateway/` | Gateway API resources |
+| Configure monitoring | `observability/datadog-agent/` | Datadog agent settings |
 | Bootstrap new cluster | `bootstrap.sh` | Requires DOPPLER_TOKEN_* envvars |
 
 ## SYNC WAVE ORDER
@@ -43,7 +45,8 @@ ArgoCD deploys in this sequence (annotations):
 | 1 | system | External-secrets, reloader, argo-rollouts |
 | 2 | networking | Gateway, HTTP redirect |
 | 3 | platform | Valkey cache |
-| 4 | projects | Microservices last |
+| 4 | observability | Datadog agent (monitoring, APM, logs) |
+| 5 | projects | Microservices last |
 
 ## CONVENTIONS
 

@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: datadog-agent
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: observability
+    app.kubernetes.io/component: monitoring
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: datadog
+    repoURL: https://helm.datadoghq.com
+    targetRevision: 3.87.1
+    helm:
+      valuesObject:
+        datadog:
+          apiKeyExistingSecret: datadog-api-keys
+          appKeyExistingSecret: datadog-api-keys
+          site: us5.datadoghq.com
+          clusterName: square-kr
+          logs:
+            enabled: true
+            containerCollectAll: true
+          apm:
+            portEnabled: true
+            socketEnabled: true
+          processAgent:
+            enabled: true
+            processCollection: true
+          networkMonitoring:
+            enabled: true
+          serviceMonitoring:
+            enabled: true
+        clusterAgent:
+          enabled: true
+          replicas: 2
+        agents:
+          tolerations:
+            - operator: Exists
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: datadog
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
