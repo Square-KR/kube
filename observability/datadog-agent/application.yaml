@@ -19,7 +19,6 @@ spec:
       valuesObject:
         datadog:
           apiKeyExistingSecret: datadog-api-keys
-          appKeyExistingSecret: datadog-api-keys
           site: us5.datadoghq.com
           clusterName: square-kr
           logs:
