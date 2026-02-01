@@ -1,0 +1,33 @@
+apiVersion: datadoghq.com/v2alpha1
+kind: DatadogAgent
+metadata:
+  name: datadog
+  namespace: datadog
+spec:
+  global:
+    clusterName: square-kr
+    site: ap1.datadoghq.com
+
+    credentials:
+      apiSecret:
+        secretName: datadog-secret
+        keyName: api-key
+
+    kubelet:
+      tlsVerify: false
+
+  features:
+    apm:
+      enabled: true
+    logCollection:
+      enabled: true
+      containerCollectAll: true
+    processDiscovery:
+      enabled: false
+    otelCollector:
+      enabled: true
+
+  override:
+    nodeAgent:
+      tolerations:
+        - operator: Exists
