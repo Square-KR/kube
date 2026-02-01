@@ -6,7 +6,7 @@ metadata:
 spec:
   global:
     clusterName: square-kr
-    site: ap1.datadoghq.com
+    site: us5.datadoghq.com
 
     credentials:
       apiSecret:
