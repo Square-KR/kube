@@ -16,7 +16,6 @@ spec:
     - list:
         elements:
           - env: dev
-          - env: prod
 
   template:
     metadata:
