@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: notification-backend
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: projects
+    app.kubernetes.io/component: notification-service
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - list:
+        elements:
+          - env: dev
+
+  template:
+    metadata:
+      name: notification-backend-{{.env}}
+      labels:
+        app.kubernetes.io/part-of: projects
+        app.kubernetes.io/component: notification-service
+        app.kubernetes.io/instance: "{{.env}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+
+      sources:
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          ref: repo
+
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          path: charts/app
+          helm:
+            releaseName: notification-backend
+            valueFiles:
+              - $repo/projects/notification-backend/{{.env}}/values.yaml
+
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          path: projects/notification-backend/{{.env}}
+          directory:
+            exclude: values.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.env}}"
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - CreateNamespace=true
