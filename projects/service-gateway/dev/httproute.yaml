@@ -3,6 +3,8 @@ kind: HTTPRoute
 metadata:
   name: service-gateway
   namespace: dev
+  annotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=false
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
@@ -18,5 +20,8 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: service-gateway
+        - group: ""
+          kind: Service
+          name: service-gateway
           port: 80
+          weight: 1
