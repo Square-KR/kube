@@ -15,15 +15,12 @@ error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 command -v kubectl >/dev/null 2>&1 || error "kubectl not found"
 command -v helmfile >/dev/null 2>&1 || error "helmfile not found"
 
-# Check Doppler tokens
-if [[ -z "${DOPPLER_TOKEN_INFRA:-}" ]]; then
-  error "DOPPLER_TOKEN_INFRA environment variable is required"
+# Check AWS credentials
+if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
+  error "AWS_ACCESS_KEY_ID environment variable is required"
 fi
-if [[ -z "${DOPPLER_TOKEN_DEV:-}" ]]; then
-  error "DOPPLER_TOKEN_DEV environment variable is required"
-fi
-if [[ -z "${DOPPLER_TOKEN_PROD:-}" ]]; then
-  error "DOPPLER_TOKEN_PROD environment variable is required"
+if [[ -z "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+  error "AWS_SECRET_ACCESS_KEY environment variable is required"
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,21 +40,12 @@ helmfile apply --file "$SCRIPT_DIR/bootstrap/argocd/helmfile.yaml" --quiet
 log "Waiting for ArgoCD to be ready..."
 kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
 
-# 3. Create Doppler token secrets
-log "Creating Doppler token secrets..."
-kubectl create secret generic doppler-token-infrastructure \
+# 3. Create AWS SSM credentials secret
+log "Creating AWS SSM credentials secret..."
+kubectl create secret generic aws-ssm-credentials \
   --namespace kube-system \
-  --from-literal=token="$DOPPLER_TOKEN_INFRA" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-kubectl create secret generic doppler-token-dev \
-  --namespace kube-system \
-  --from-literal=token="$DOPPLER_TOKEN_DEV" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-kubectl create secret generic doppler-token-prod \
-  --namespace kube-system \
-  --from-literal=token="$DOPPLER_TOKEN_PROD" \
+  --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # 4. Apply root application

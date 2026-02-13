@@ -24,7 +24,7 @@ projects/
 | Add new service | Copy existing dir | Update applicationset.yaml name/labels |
 | Change image version | `{env}/values.yaml` | `image.version: <commit-sha>` |
 | Add environment var | `{env}/values.yaml` | Under `env:` array |
-| Configure secrets | `{env}/external-secret.yaml` | Match Doppler prefix pattern |
+| Configure secrets | `{env}/external-secret.yaml` | Match SSM path pattern |
 | Add HTTP route | `{env}/httproute.yaml` | Attach to Gateway in `infra` ns |
 
 ## ADDING NEW SERVICE
@@ -32,16 +32,17 @@ projects/
 1. Create `projects/{name}/applicationset.yaml`:
    - Generator: `list.elements: [{env: dev}, {env: prod}]`
    - Sources: repo ref + charts/app + env directory
-   
+
 2. Create `projects/{name}/{dev,prod}/`:
    - `values.yaml` (image, port, resources, secrets)
-   - `external-secret.yaml` (Doppler → K8s secret)
+   - `external-secret.yaml` (AWS SSM → K8s secret)
    - `pull-secret.yaml` (ghcr.io auth)
    - `httproute.yaml` (optional, for external access)
 
-3. Configure Doppler:
-   - Prefix vars: `{PREFIX}_VAR_NAME`
-   - Update ExternalSecret regexp: `^{PREFIX}_(.*)`
+3. Configure SSM:
+   - SSM Parameter Store에 `/{env}/{service}/{VAR_NAME}` 경로로 파라미터 생성
+   - ExternalSecret regexp: `^/{env}/{service}/`
+   - rewrite로 경로 prefix strip: `^/{env}/{service}/(.*)` → `$1`
 
 ## CONVENTIONS
 

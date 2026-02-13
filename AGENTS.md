@@ -1,12 +1,12 @@
 # KUBERNETES GITOPS KNOWLEDGE BASE
 
-**Generated:** 2025-02-01  
-**Commit:** 8403d2b  
+**Generated:** 2025-02-01
+**Commit:** 8403d2b
 **Branch:** main
 
 ## OVERVIEW
 
-ArgoCD-managed Kubernetes GitOps monorepo for Square-KR microservices. Cilium CNI, Argo Rollouts (blue-green), External-Secrets (Doppler).
+ArgoCD-managed Kubernetes GitOps monorepo for Square-KR microservices. Cilium CNI, Argo Rollouts (blue-green), External-Secrets (AWS SSM Parameter Store).
 
 ## STRUCTURE
 
@@ -30,10 +30,10 @@ ArgoCD-managed Kubernetes GitOps monorepo for Square-KR microservices. Cilium CN
 | Add new microservice | `projects/{name}/` | Copy existing, update applicationset.yaml |
 | Modify Helm defaults | `charts/app/values.yaml` | Affects all services |
 | Add system component | `system/{name}/` | Create application.yaml |
-| Configure secrets | `system/external-secrets/` | Doppler SecretStores |
+| Configure secrets | `system/external-secrets/` | AWS SSM ClusterSecretStore |
 | Update gateway/routes | `networking/gateway/` | Gateway API resources |
 | Configure monitoring | `observability/datadog-agent/` | Datadog agent settings |
-| Bootstrap new cluster | `bootstrap.sh` | Requires DOPPLER_TOKEN_* envvars |
+| Bootstrap new cluster | `bootstrap.sh` | Requires AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY |
 
 ## SYNC WAVE ORDER
 
@@ -69,9 +69,10 @@ projects/{service}/
 ```
 
 ### Secret Naming
-- Doppler vars prefixed: `SG_*` → service-gateway, `AB_*` → accounts-backend
-- ExternalSecret rewrites prefix off: `^SG_(.*)` → `$1`
-- ClusterSecretStores: `doppler-infrastructure`, `doppler-dev`, `doppler-prod`
+- SSM Parameter Store 경로 기반: `/{env}/{service}/{VAR_NAME}`
+- 예: `/dev/accounts-backend/DATABASE_URL`, `/dev/service-gateway/UPSTREAM_URL`
+- ExternalSecret에서 경로 prefix를 strip: `^/dev/accounts-backend/(.*)` → `$1`
+- ClusterSecretStore: `aws-ssm` (통합 1개)
 
 ### Health Checks
 - Spring Boot actuator: `/actuator/health/liveness`, `/actuator/health/readiness`
@@ -81,7 +82,7 @@ projects/{service}/
 
 | DON'T | DO INSTEAD |
 |-------|------------|
-| Hardcode secrets in YAML | Use ExternalSecret + Doppler |
+| Hardcode secrets in YAML | Use ExternalSecret + AWS SSM |
 | Edit `charts/app/` for one service | Override in `values.yaml` |
 | Skip sync-wave annotations | Always set appropriate wave |
 | Deploy to wrong namespace | Namespace = environment (dev/prod) |
@@ -91,7 +92,7 @@ projects/{service}/
 
 ```bash
 # Bootstrap new cluster
-export DOPPLER_TOKEN_INFRA=... DOPPLER_TOKEN_DEV=... DOPPLER_TOKEN_PROD=...
+export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 ./bootstrap.sh
 
 # Access ArgoCD UI
