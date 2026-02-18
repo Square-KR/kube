@@ -1,7 +1,7 @@
 port: 3000
 image:
   name: ghcr.io/square-kr/sso-server
-  version: "4136c7e9"
+  version: "25256efe"
 resources:
   cpu: "250m"
   memory: "512Mi"
