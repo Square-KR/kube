@@ -4,7 +4,7 @@ healthCheck:
   readiness: /readyz
 image:
   name: ghcr.io/square-kr/sso-server
-  version: "7f620596"
+  version: "9a8ce9f7"
 resources:
   cpu: "250m"
   memory: "512Mi"
