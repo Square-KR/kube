@@ -1,115 +1,123 @@
 # KUBERNETES GITOPS KNOWLEDGE BASE
 
-**Generated:** 2025-02-01
-**Commit:** 8403d2b
-**Branch:** main
-
 ## OVERVIEW
 
-ArgoCD-managed Kubernetes GitOps monorepo for Square-KR microservices. Cilium CNI, Argo Rollouts (blue-green), External-Secrets (AWS SSM Parameter Store).
+Square-KR Kubernetes GitOps monorepo. ArgoCD App-of-Apps로 클러스터 리소스를 배포하며, 네트워킹은 Cilium Gateway API, 애플리케이션 배포는 Argo Rollouts, 시크릿 관리는 External Secrets + AWS SSM Parameter Store를 사용한다.
 
-## STRUCTURE
+## CURRENT STRUCTURE
 
-```
+```text
 .
-├── bootstrap/          # Cluster init: Cilium CNI + ArgoCD
-├── system/             # Core: cert-manager, external-secrets, argo-rollouts, reloader
-├── networking/         # Gateway API (Cilium) + HTTPRoutes
-├── platform/           # Data layer: Valkey (Redis)
-├── observability/      # Monitoring: Datadog agent
-├── projects/           # Microservices: accounts-backend, service-gateway
-├── charts/app/         # Generic Helm chart for all workloads
-├── root.yaml           # ArgoCD App-of-Apps entry point
-└── bootstrap.sh        # Cluster bootstrap script
+├── bootstrap/          # 초기 부트스트랩: Cilium, ArgoCD
+├── system/             # 공통 시스템 컴포넌트: cert-manager, external-secrets, argo-rollouts, reloader
+├── networking/         # Gateway API 및 공통 HTTP redirect
+├── platform/           # 공용 데이터 레이어: Valkey
+├── observability/      # Datadog operator + DatadogAgent
+├── projects/           # 서비스 배포 정의 (현재 notification-backend 중심)
+├── charts/app/         # 공통 애플리케이션 Helm chart
+├── root.yaml           # 최상위 ArgoCD root Application
+└── bootstrap.sh        # 새 클러스터 초기 설치 스크립트
 ```
 
 ## WHERE TO LOOK
 
-| Task | Location | Notes |
-|------|----------|-------|
-| Add new microservice | `projects/{name}/` | Copy existing, update applicationset.yaml |
-| Modify Helm defaults | `charts/app/values.yaml` | Affects all services |
-| Add system component | `system/{name}/` | Create application.yaml |
-| Configure secrets | `system/external-secrets/` | AWS SSM ClusterSecretStore |
-| Update gateway/routes | `networking/gateway/` | Gateway API resources |
-| Configure monitoring | `observability/datadog-agent/` | Datadog agent settings |
-| Bootstrap new cluster | `bootstrap.sh` | Requires AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY |
+| 작업 | 위치 | 메모 |
+|------|------|------|
+| 클러스터 부트스트랩 수정 | `bootstrap/`, `bootstrap.sh` | Cilium/ArgoCD 설치 순서와 초기 secret 생성 |
+| 루트 App-of-Apps 수정 | `root.yaml` | `**/_application.yaml`만 수집 |
+| 시스템 컴포넌트 수정 | `system/` | cert-manager, external-secrets, argo-rollouts, reloader |
+| 공통 게이트웨이 수정 | `networking/gateway/` | `infra` 네임스페이스에 Gateway/HTTPRoute 배포 |
+| 공용 캐시 수정 | `platform/valkey/` | `dev`, `prod` 환경별 ApplicationSet |
+| 모니터링 수정 | `observability/datadog/` | Datadog operator + `DatadogAgent` + ExternalSecret |
+| 서비스 배포 수정 | `projects/` | 현재 `notification-backend` ApplicationSet 및 env 값 |
+| 공통 앱 템플릿 수정 | `charts/app/` | Rollout/Service/HPA/PDB 공통 chart |
 
-## SYNC WAVE ORDER
+## DEPLOYMENT FLOW
 
-ArgoCD deploys in this sequence (annotations):
+ArgoCD sync wave 순서는 다음과 같다.
 
-| Wave | Component | Purpose |
-|------|-----------|---------|
-| 0 | cert-manager | TLS certificates first |
-| 1 | system | External-secrets, reloader, argo-rollouts |
-| 2 | networking | Gateway, HTTP redirect |
-| 3 | platform | Valkey cache |
-| 4 | observability | Datadog agent (monitoring, APM, logs) |
-| 5 | projects | Microservices last |
+| Wave | 구성 | 목적 |
+|------|------|------|
+| 0 | `system/cert-manager` | 인증서 및 Gateway TLS 선행 |
+| 1 | `system/*` | External Secrets, Reloader, Argo Rollouts |
+| 2 | `networking/*` | Gateway 및 HTTP -> HTTPS redirect |
+| 3 | `platform/*` | 공용 데이터 계층 |
+| 4 | `observability/*` | Datadog 수집기 |
+| 5 | `projects/*` | 서비스 배포 |
 
-## CONVENTIONS
+## REPO CONVENTIONS
 
-### ArgoCD Apps
-- `_application.yaml` = App-of-Apps parent (picks up `**/{application,applicationset}.yaml`)
-- `applicationset.yaml` = Multi-env deployments (dev/prod generators)
-- `application.yaml` = Single deployment
+### ArgoCD 파일 패턴
 
-### Environment Structure
-```
-projects/{service}/
-├── applicationset.yaml    # ArgoCD ApplicationSet
-├── dev/
-│   ├── values.yaml        # Helm values (image, resources)
-│   ├── external-secret.yaml
-│   ├── pull-secret.yaml
-│   └── httproute.yaml     # Gateway route
-└── prod/
-    └── (same structure)
-```
+- `root.yaml`: 저장소 최상위 root Application
+- `_application.yaml`: 상위 App-of-Apps 엔트리
+- `application.yaml`: 단일 컴포넌트용 Application
+- `applicationset.yaml`: 환경별 또는 반복 배포용 ApplicationSet
 
-### Secret Naming
-- SSM Parameter Store 경로 기반: `/{env}/{service}/{VAR_NAME}`
-- 예: `/dev/accounts-backend/DATABASE_URL`, `/dev/service-gateway/UPSTREAM_URL`
-- ExternalSecret에서 경로 prefix를 strip: `^/dev/accounts-backend/(.*)` → `$1`
-- ClusterSecretStore: `aws-ssm` (통합 1개)
+주의:
+- `root.yaml`는 `**/_application.yaml`만 수집한다.
+- 각 도메인 폴더의 `_application.yaml`는 하위의 `application.yaml`, `applicationset.yaml`를 수집한다.
 
-### Health Checks
-- Spring Boot actuator: `/actuator/health/liveness`, `/actuator/health/readiness`
-- Generic default: `/healthz/liveness`, `/healthz/readiness`
+### Namespace 규칙
+
+- `argocd`: ArgoCD control plane
+- `kube-system`: Cilium, cert-manager, external-secrets, reloader, argo-rollouts
+- `infra`: Gateway API 공통 리소스
+- `datadog`: Datadog operator 및 agent
+- `dev`, `prod`: 애플리케이션/플랫폼 워크로드
+
+### Secret 규칙
+
+- AWS SSM Parameter Store를 단일 `ClusterSecretStore`(`aws-ssm`)로 참조한다.
+- 서비스 시크릿은 `/{env}/{service}/{KEY}` 패턴을 사용한다.
+- 인프라 공용 시크릿은 `/infrastructure/...` 경로를 사용한다.
+- GHCR pull secret은 서비스별 파일이 아니라 `system/external-secrets/ghcr-pull-secret.yaml`에서 생성한다.
+
+### 애플리케이션 배포 규칙
+
+- 서비스 워크로드는 `Deployment` 대신 Argo `Rollout`을 사용한다.
+- 공통 배포 로직은 `charts/app`에 두고, 서비스 차이는 `projects/{service}/{env}/values.yaml`에서 오버라이드한다.
+- 서비스별 env 파일에는 보통 `values.yaml`, `external-secret.yaml`이 있고, 필요할 때만 추가 매니페스트를 둔다.
+
+## CURRENT STATE NOTES
+
+- 현재 `projects/`에는 `notification-backend` 배포 정의가 남아 있다.
+- 현재 서비스 환경 디렉터리는 `projects/notification-backend/dev/`만 존재한다.
+- 공통 게이트웨이는 `sqr.kr` apex와 `*.sqr.kr` wildcard HTTPS listener를 제공한다.
+- Datadog은 `us5.datadoghq.com` 사이트를 사용하며 APM, 로그 수집, OTEL collector를 활성화한다.
+- Cilium은 Gateway API와 Hubble을 활성화한 상태로 부트스트랩된다.
 
 ## ANTI-PATTERNS
 
-| DON'T | DO INSTEAD |
-|-------|------------|
-| Hardcode secrets in YAML | Use ExternalSecret + AWS SSM |
-| Edit `charts/app/` for one service | Override in `values.yaml` |
-| Skip sync-wave annotations | Always set appropriate wave |
-| Deploy to wrong namespace | Namespace = environment (dev/prod) |
-| Use Deployment | Use Argo Rollout (blue-green) |
+| 피해야 할 것 | 대신 해야 할 것 |
+|--------------|----------------|
+| YAML에 시크릿 직접 하드코딩 | ExternalSecret + AWS SSM 사용 |
+| 서비스 하나 때문에 `charts/app/` 직접 수정 | 먼저 `values.yaml` 오버라이드 가능 여부 확인 |
+| 서비스별 `pull-secret.yaml` 복제 | 공용 `ghcr-pull-secret` 재사용 |
+| 루트에서 `application.yaml`를 직접 추가 | 도메인별 `_application.yaml` 아래에 연결 |
+| 서비스 워크로드를 `Deployment`로 작성 | 공통 chart의 `Rollout` 경로 유지 |
 
-## COMMANDS
+## USEFUL COMMANDS
 
 ```bash
-# Bootstrap new cluster
-export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
+# 새 클러스터 부트스트랩
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
 ./bootstrap.sh
 
-# Access ArgoCD UI
+# ArgoCD UI 접속
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
 
-# Force sync application
+# 특정 ArgoCD 앱 강제 sync
 kubectl -n argocd patch app <app-name> -p '{"operation":{"sync":{}}}' --type merge
 
-# Check Cilium status
+# Cilium 상태 확인
 kubectl -n kube-system exec -it ds/cilium -- cilium status
 ```
 
-## NOTES
+## REMINDERS
 
-- **NLB Source IP**: Disabled (Cloudflare proxy provides IP via headers)
-- **Image registry**: ghcr.io/square-kr/* (private, requires pull-secret)
-- **Rollout strategy**: Blue-green via Argo Rollouts
-- **Documentation language**: Korean (한국어)
-- **Helm diff plugin**: Required for `helmfile diff` (`helm plugin install https://github.com/databus23/helm-diff`)
+- 문서 언어는 한국어 기준으로 유지한다.
+- `helmfile diff`를 쓰려면 `helm-diff` 플러그인이 필요하다.
+- Cloudflare proxied 구성을 전제로 NLB source IP 보존은 비활성화한다.
