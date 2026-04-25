@@ -1,0 +1,39 @@
+port: 3000
+healthCheck:
+  liveness: /healthz
+  readiness: /readyz
+image:
+  name: ghcr.io/square-kr/better-auth
+  version: "latest"
+resources:
+  cpu: "250m"
+  memory: "512Mi"
+env:
+  - name: NODE_ENV
+    value: production
+  - name: PORT
+    value: "3000"
+  - name: AUTH_BASE_URL
+    value: https://accounts.sqr.kr
+  - name: JWT_AUDIENCE
+    value: square-msa
+  - name: TRUSTED_ORIGINS
+    value: https://accounts.sqr.kr,https://domain.sqr.kr
+  - name: AUTH_COOKIE_DOMAIN
+    value: sqr.kr
+  - name: REDIS_URL
+    value: redis://valkey-primary:6379
+  - name: NOTIFICATION_BASE_URL
+    value: http://notification-backend
+  - name: NOTIFICATION_ENVIRONMENT
+    value: DEV
+  - name: NOTIFICATION_TIMEOUT_MS
+    value: "10000"
+  - name: NOTIFICATION_RETRIES
+    value: "1"
+  - name: AUTH_EMAIL_LOCALE
+    value: ko
+secrets:
+  - better-auth
+imagePullSecrets:
+  - ghcr-pull-secret
