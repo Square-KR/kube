@@ -9,6 +9,7 @@ healthCheck:
   port: ""
   liveness: /healthz/liveness
   readiness: /healthz/readiness
+  timeoutSeconds: 1
 
 image:
   name: ""

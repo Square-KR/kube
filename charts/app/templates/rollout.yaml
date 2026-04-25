@@ -59,6 +59,7 @@ spec:
               path: {{ .Values.healthCheck.liveness }}
               port: {{ .Values.healthCheck.port | default .Values.port }}
             initialDelaySeconds: 10
+            timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds | default 1 }}
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 6
@@ -67,6 +68,7 @@ spec:
               path: {{ .Values.healthCheck.readiness }}
               port: {{ .Values.healthCheck.port | default .Values.port }}
             initialDelaySeconds: 10
+            timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds | default 1 }}
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 3

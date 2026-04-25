@@ -2,6 +2,7 @@ port: 3000
 healthCheck:
   liveness: /healthz
   readiness: /readyz
+  timeoutSeconds: 5
 image:
   name: ghcr.io/square-kr/better-auth
   version: "a99c9a04"
