@@ -15,7 +15,7 @@ env:
   - name: PORT
     value: "3000"
   - name: AUTH_BASE_URL
-    value: https://dev-accounts-api.sqr.kr
+    value: https://dev-accounts.sqr.kr
   - name: JWT_AUDIENCE
     value: square-msa
   - name: TRUSTED_ORIGINS
