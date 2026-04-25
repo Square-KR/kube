@@ -5,7 +5,7 @@ healthCheck:
   timeoutSeconds: 5
 image:
   name: ghcr.io/square-kr/better-auth
-  version: "a99c9a04"
+  version: "b5b37749"
 resources:
   cpu: "250m"
   memory: "512Mi"
@@ -15,15 +15,19 @@ env:
   - name: PORT
     value: "3000"
   - name: AUTH_BASE_URL
-    value: https://accounts.sqr.kr
+    value: https://dev-accounts-api.sqr.kr
   - name: JWT_AUDIENCE
     value: square-msa
   - name: TRUSTED_ORIGINS
-    value: https://accounts.sqr.kr,https://domain.sqr.kr
+    value: https://dev-accounts.sqr.kr,https://dev-domain.sqr.kr
   - name: AUTH_COOKIE_DOMAIN
     value: sqr.kr
-  - name: REDIS_URL
-    value: redis://valkey:6379
+  - name: REDIS_MODE
+    value: standalone
+  - name: REDIS_HOST
+    value: valkey
+  - name: REDIS_PORT
+    value: "6379"
   - name: NOTIFICATION_BASE_URL
     value: http://notification-backend
   - name: NOTIFICATION_ENVIRONMENT
