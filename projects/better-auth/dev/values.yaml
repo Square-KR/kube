@@ -22,7 +22,7 @@ env:
   - name: AUTH_COOKIE_DOMAIN
     value: sqr.kr
   - name: REDIS_URL
-    value: redis://valkey-primary:6379
+    value: redis://valkey:6379
   - name: NOTIFICATION_BASE_URL
     value: http://notification-backend
   - name: NOTIFICATION_ENVIRONMENT
