@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-api-crds
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: system
+    app.kubernetes.io/component: gateway-api-crds
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://github.com/kubernetes-sigs/gateway-api
+      targetRevision: v1.2.0
+      path: config/crd/standard
+
+    - repoURL: https://github.com/kubernetes-sigs/gateway-api
+      targetRevision: v1.2.0
+      path: config/crd/experimental
+      directory:
+        include: gateway.networking.k8s.io_tlsroutes.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
