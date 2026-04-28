@@ -29,5 +29,8 @@ spec:
 
   override:
     nodeAgent:
+      env:
+        - name: DD_IGNORE_AUTOCONF
+          value: "kubernetes_state redisdb"
       tolerations:
         - operator: Exists
