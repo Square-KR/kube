@@ -24,10 +24,10 @@ env:
     value: sqr.kr
   - name: REDIS_MODE
     value: sentinel
-  - name: REDIS_HOST
-    value: valkey
-  - name: REDIS_PORT
-    value: "6379"
+  - name: REDIS_SENTINELS
+    value: valkey:26379
+  - name: REDIS_SENTINEL_MASTER_NAME
+    value: primary
   - name: NOTIFICATION_BASE_URL
     value: http://notification-backend
   - name: NOTIFICATION_ENVIRONMENT
