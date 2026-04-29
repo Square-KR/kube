@@ -107,6 +107,25 @@ spec:
                       app.kubernetes.io/name: valkey
 
             replica:
+              podAnnotations:
+                ad.datadoghq.com/valkey.checks: |
+                  {
+                    "redisdb": {
+                      "init_config": {},
+                      "instances": [
+                        {
+                          "host": "%%host%%",
+                          "port": "6379",
+                          "tags": [
+                            "service:valkey",
+                            "env:{{.env}}",
+                            "component:cache",
+                            "datastore:valkey"
+                          ]
+                        }
+                      ]
+                    }
+                  }
               resources:
                 requests:
                   cpu: "{{.resources.cpu}}"

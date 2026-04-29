@@ -16,6 +16,10 @@ spec:
     kubelet:
       tlsVerify: false
 
+    podLabelsAsTags:
+      statefulset.kubernetes.io/pod-name: valkey_pod
+      apps.kubernetes.io/pod-index: valkey_pod_index
+
   features:
     apm:
       enabled: true
