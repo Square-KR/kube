@@ -60,7 +60,14 @@ packages_from_values() {
 packages_from_values | while IFS= read -r package; do
   echo "Checking ${package}"
 
-  versions_json="$(gh api --paginate --slurp "/orgs/${ORG}/packages/${PACKAGE_TYPE}/${package}/versions?per_page=100")"
+  versions_error_file="$(mktemp)"
+  if ! versions_json="$(gh api --paginate --slurp "/orgs/${ORG}/packages/${PACKAGE_TYPE}/${package}/versions?per_page=100" 2>"$versions_error_file")"; then
+    cat "$versions_error_file" >&2
+    rm -f "$versions_error_file"
+    echo "::error::Cannot access GHCR package ${ORG}/${package}. Grant this workflow repository Admin access in Package settings > Manage Actions access." >&2
+    exit 1
+  fi
+  rm -f "$versions_error_file"
 
   protected_tags_file="$(mktemp)"
   {
