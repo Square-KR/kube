@@ -46,7 +46,18 @@ deployed_tags_for_package() {
   done
 }
 
-gh api --paginate "/orgs/${ORG}/packages?package_type=${PACKAGE_TYPE}&per_page=100" --jq '.[].name' | sort | while IFS= read -r package; do
+packages_from_values() {
+  find projects -path '*/values.yaml' -type f | sort | while IFS= read -r values_file; do
+    ruby -ryaml -e '
+      data = YAML.load_file(ARGV.fetch(0)) || {}
+      image = data.fetch("image", {}) || {}
+      name = image["name"].to_s
+      puts name.split("/").last if name.start_with?("ghcr.io/")
+    ' "$values_file"
+  done | sed '/^$/d' | sort -u
+}
+
+packages_from_values | while IFS= read -r package; do
   echo "Checking ${package}"
 
   versions_json="$(gh api --paginate --slurp "/orgs/${ORG}/packages/${PACKAGE_TYPE}/${package}/versions?per_page=100")"
