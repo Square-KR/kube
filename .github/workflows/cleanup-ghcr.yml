@@ -1,0 +1,36 @@
+name: cleanup-ghcr
+
+on:
+  schedule:
+    - cron: "0 18 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print deletions without deleting package versions
+        required: true
+        type: boolean
+        default: true
+      keep:
+        description: Number of newest versions to keep per package
+        required: true
+        type: number
+        default: 5
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cleanup old GHCR package versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORG: Square-KR
+          KEEP: ${{ inputs.keep || 5 }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: ./scripts/cleanup-ghcr.sh
