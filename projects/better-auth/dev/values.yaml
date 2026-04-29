@@ -23,7 +23,7 @@ env:
   - name: AUTH_COOKIE_DOMAIN
     value: sqr.kr
   - name: REDIS_MODE
-    value: standalone
+    value: sentinel
   - name: REDIS_HOST
     value: valkey
   - name: REDIS_PORT
