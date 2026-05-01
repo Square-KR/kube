@@ -4,7 +4,7 @@ healthCheck:
   readiness: /readyz
 image:
   name: ghcr.io/square-kr/notification-backend
-  version: "f2c45075"
+  version: "4045f33e"
 resources:
   cpu: "250m"
   memory: "512Mi"
