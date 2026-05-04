@@ -19,6 +19,8 @@ spec:
             redis:
               maxmemory: 256mb
             replicas: 1
+            sentinel:
+              quorum: 1
             resources:
               cpu: 200m
               memory: 512Mi
@@ -29,6 +31,8 @@ spec:
             redis:
               maxmemory: 1536mb
             replicas: 3
+            sentinel:
+              quorum: 2
             resources:
               cpu: 500m
               memory: 2Gi
@@ -68,7 +72,7 @@ spec:
 
               save ""
 
-            useHostnames: false
+            useHostnames: true
 
             image:
               repository: bitnamilegacy/valkey
@@ -79,6 +83,7 @@ spec:
             sentinel:
               enabled: true
               primarySet: primary
+              quorum: "{{.sentinel.quorum}}"
               image:
                 repository: bitnamilegacy/valkey-sentinel
               resources:
