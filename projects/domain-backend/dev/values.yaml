@@ -14,12 +14,6 @@ env:
     value: stage
   - name: SERVER_PORT
     value: "8080"
-  - name: AUTH_JWT_ISSUER_URI
-    value: https://dev-accounts.sqr.kr
-  - name: AUTH_JWT_JWK_SET_URI
-    value: http://better-auth/api/auth/jwks
-  - name: AUTH_JWT_AUDIENCE
-    value: square-msa
   - name: LETO_ENABLED
     value: "true"
 secrets:
