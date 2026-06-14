@@ -6,8 +6,8 @@ image:
   name: ghcr.io/square-kr/notification-backend
   version: "88b586ab"
 resources:
-  cpu: "250m"
-  memory: "512Mi"
+  cpu: "50m"
+  memory: "256Mi"
 secrets:
   - notification-backend
 imagePullSecrets:

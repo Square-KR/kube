@@ -7,8 +7,8 @@ image:
   name: ghcr.io/square-kr/square-domain-backend
   version: "63cc5d5e"
 resources:
-  cpu: "250m"
-  memory: "512Mi"
+  cpu: "100m"
+  memory: "1Gi"
 env:
   - name: SPRING_PROFILES_ACTIVE
     value: stage

@@ -52,6 +52,7 @@ spec:
           resources:
             requests:
               cpu: {{ .Values.resources.cpu }}
+              memory: {{ .Values.resources.memory }}
             limits:
               memory: {{ .Values.resources.memory }}
           livenessProbe:
