@@ -49,5 +49,6 @@ prometheus:
   enabled: true
 
 operator:
+  replicas: 1
   prometheus:
     enabled: true
