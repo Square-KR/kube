@@ -5,7 +5,7 @@ healthCheck:
   timeoutSeconds: 5
 image:
   name: ghcr.io/square-kr/square-domain-backend
-  version: "6cfbe789"
+  version: "a9d8018b"
 resources:
   cpu: "100m"
   memory: "1Gi"
