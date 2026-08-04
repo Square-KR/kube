@@ -41,6 +41,14 @@ spec:
       tolerations:
         - operator: Exists
     clusterAgent:
+      volumes:
+        - name: cluster-agent-confd
+          emptyDir: {}
+      containers:
+        cluster-agent:
+          volumeMounts:
+            - name: cluster-agent-confd
+              mountPath: /etc/datadog-agent/conf.d
       extraConfd:
         configDataMap:
           postgres.yaml: |-
