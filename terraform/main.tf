@@ -296,6 +296,7 @@ resource "oci_core_instance" "bastion" {
     assign_public_ip = true
     display_name     = "squarek8s-bastion-db"
     hostname_label   = "bastion-db"
+    private_ip       = "10.20.0.45"
     subnet_id        = oci_core_subnet.public.id
   }
 
