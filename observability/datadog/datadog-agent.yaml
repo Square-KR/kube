@@ -78,9 +78,7 @@ spec:
                 ssl: require
                 dbm: true
                 relations:
-                  - relation_name: notification_deliveries
-                  - relation_name: notification_requests
-                  - relation_name: templates
+                  - relation_regex: .*
                 collect_bloat_metrics: true
                 collect_wal_metrics: true
                 data_directory: /var/lib/postgresql/16/main
