@@ -9,6 +9,31 @@ locals {
   oke_image_name     = "Oracle-Linux-9.8-aarch64-2026.07.20-0-OKE-1.33.10-1578"
   shape              = "VM.Standard.A1.Flex"
 
+  cloudflare_ipv4_cidrs = toset([
+    "103.21.244.0/22",
+    "103.22.200.0/22",
+    "103.31.4.0/22",
+    "104.16.0.0/13",
+    "104.24.0.0/14",
+    "108.162.192.0/18",
+    "131.0.72.0/22",
+    "141.101.64.0/18",
+    "162.158.0.0/15",
+    "172.64.0.0/13",
+    "173.245.48.0/20",
+    "188.114.96.0/20",
+    "190.93.240.0/20",
+    "197.234.240.0/22",
+    "198.41.128.0/17",
+  ])
+  envoy_lb_ingress_rules = {
+    for rule in setproduct(local.cloudflare_ipv4_cidrs, toset([80, 443])) :
+    "${replace(rule[0], "/", "-")}-${rule[1]}" => {
+      source = rule[0]
+      port   = rule[1]
+    }
+  }
+
   availability_domain = data.oci_identity_availability_domains.available.availability_domains[0].name
   oke_image_id = one([
     for source in data.oci_containerengine_node_pool_option.available.sources : source.image_id
@@ -128,18 +153,6 @@ resource "oci_core_security_list" "public" {
   }
 
   dynamic "ingress_security_rules" {
-    for_each = toset([80, 443])
-    content {
-      protocol = "6"
-      source   = "0.0.0.0/0"
-      tcp_options {
-        min = ingress_security_rules.value
-        max = ingress_security_rules.value
-      }
-    }
-  }
-
-  dynamic "ingress_security_rules" {
     for_each = toset([22, 6443])
     content {
       protocol = "6"
@@ -162,6 +175,32 @@ resource "oci_core_security_list" "public" {
 
   lifecycle {
     ignore_changes = [egress_security_rules]
+  }
+}
+
+resource "oci_core_network_security_group" "envoy_lb" {
+  compartment_id = var.compartment_id
+  display_name   = "squarek8s-envoy-lb-nsg"
+  freeform_tags  = local.tags
+  vcn_id         = oci_core_vcn.main.id
+}
+
+resource "oci_core_network_security_group_security_rule" "envoy_lb_ingress" {
+  for_each = local.envoy_lb_ingress_rules
+
+  description               = "Allow Cloudflare proxy traffic"
+  direction                 = "INGRESS"
+  network_security_group_id = oci_core_network_security_group.envoy_lb.id
+  protocol                  = "6"
+  source                    = each.value.source
+  source_type               = "CIDR_BLOCK"
+  stateless                 = false
+
+  tcp_options {
+    destination_port_range {
+      min = each.value.port
+      max = each.value.port
+    }
   }
 }
 

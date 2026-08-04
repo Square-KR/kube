@@ -9,6 +9,8 @@ spec:
     kubernetes:
       envoyService:
         annotations:
+          oci.oraclecloud.com/oci-network-security-groups: ocid1.networksecuritygroup.oc1.ap-seoul-1.aaaaaaaa5db57tpu7fkxjxs3svo4vjtkkix6oithqp5nqna47usnqc4eqx3q
+          oci.oraclecloud.com/security-rule-management-mode: "None"
           service.beta.kubernetes.io/oci-load-balancer-shape: flexible
           service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
           service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "10"

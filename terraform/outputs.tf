@@ -24,3 +24,7 @@ output "load_balancer_subnet_id" {
   value = oci_core_subnet.public.id
 }
 
+output "envoy_lb_nsg_id" {
+  description = "NSG attached to the Envoy OCI Load Balancer"
+  value       = oci_core_network_security_group.envoy_lb.id
+}
