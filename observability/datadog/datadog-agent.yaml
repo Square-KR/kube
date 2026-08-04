@@ -34,10 +34,11 @@ spec:
       env:
         - name: DD_IGNORE_AUTOCONF
           value: "kubernetes_state"
-        - name: DD_SECRET_BACKEND_TYPE
-          value: k8s.secrets
-        - name: DD_SECRET_BACKEND_CONFIG
-          value: '{"api_server":"https://{KUBERNETES_SERVICE_HOST}:{KUBERNETES_SERVICE_PORT}"}'
+        - name: DD_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: datadog-secret
+              key: postgres-password
       tolerations:
         - operator: Exists
     clusterAgent:
@@ -58,7 +59,7 @@ spec:
               - host: 10.20.0.45
                 port: 5432
                 username: square_datadog
-                password: "ENC[datadog/datadog-secret;postgres-password]"
+                password: "%%env_DD_POSTGRES_PASSWORD%%"
                 dbname: square_notification
                 dbstrict: true
                 ssl: require
