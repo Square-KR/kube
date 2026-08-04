@@ -34,20 +34,27 @@ spec:
       env:
         - name: DD_IGNORE_AUTOCONF
           value: "kubernetes_state"
-        - name: DD_POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: datadog-secret
-              key: postgres-password
+      volumes:
+        - name: postgresql-monitor-secret
+          secret:
+            secretName: datadog-secret
+            items:
+              - key: postgres-password
+                path: postgres-password
+      containers:
+        agent:
+          env:
+            - name: DD_SECRET_BACKEND_COMMAND
+              value: /readsecret.py
+            - name: DD_SECRET_BACKEND_ARGUMENTS
+              value: /etc/datadog-agent/secrets
+          volumeMounts:
+            - name: postgresql-monitor-secret
+              mountPath: /etc/datadog-agent/secrets
+              readOnly: true
       tolerations:
         - operator: Exists
     clusterAgent:
-      env:
-        - name: DD_POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: datadog-secret
-              key: postgres-password
       volumes:
         - name: cluster-agent-confd
           emptyDir: {}
@@ -65,7 +72,7 @@ spec:
               - host: 10.20.0.45
                 port: 5432
                 username: square_datadog
-                password: "%%env_DD_POSTGRES_PASSWORD%%"
+                password: "ENC[postgres-password]"
                 dbname: square_notification
                 dbstrict: true
                 ssl: require
