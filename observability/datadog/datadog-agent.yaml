@@ -77,6 +77,19 @@ spec:
                 dbstrict: true
                 ssl: require
                 dbm: true
+                relations:
+                  - relation_name: notification_deliveries
+                    schemas:
+                      - public
+                  - relation_name: notification_requests
+                    schemas:
+                      - public
+                  - relation_name: templates
+                    schemas:
+                      - public
+                collect_bloat_metrics: true
+                collect_wal_metrics: true
+                collect_checksum_metrics: true
                 reported_hostname: squarek8s-postgresql
                 tags:
                   - env:dev
