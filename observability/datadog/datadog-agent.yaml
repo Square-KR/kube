@@ -19,6 +19,8 @@ spec:
   features:
     apm:
       enabled: true
+    clusterChecks:
+      enabled: true
     logCollection:
       enabled: true
       containerCollectAll: true
@@ -32,5 +34,28 @@ spec:
       env:
         - name: DD_IGNORE_AUTOCONF
           value: "kubernetes_state"
+        - name: DD_SECRET_BACKEND_TYPE
+          value: k8s.secrets
+        - name: DD_SECRET_BACKEND_CONFIG
+          value: '{"api_server":"https://{KUBERNETES_SERVICE_HOST}:{KUBERNETES_SERVICE_PORT}"}'
       tolerations:
         - operator: Exists
+    clusterAgent:
+      extraConfd:
+        configDataMap:
+          postgres.yaml: |-
+            cluster_check: true
+            init_config:
+            instances:
+              - host: 10.20.0.45
+                port: 5432
+                username: square_datadog
+                password: "ENC[datadog/datadog-secret;postgres-password]"
+                dbname: square_notification
+                dbstrict: true
+                ssl: require
+                dbm: true
+                reported_hostname: squarek8s-postgresql
+                tags:
+                  - env:dev
+                  - service:postgresql
