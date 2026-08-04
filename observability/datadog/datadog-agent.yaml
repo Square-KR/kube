@@ -33,7 +33,7 @@ spec:
     nodeAgent:
       env:
         - name: DD_IGNORE_AUTOCONF
-          value: "kubernetes_state"
+          value: "kubernetes_state redisdb"
       volumes:
         - name: postgresql-monitor-secret
           secret:
