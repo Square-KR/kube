@@ -159,6 +159,10 @@ resource "oci_core_security_list" "public" {
       max = 5432
     }
   }
+
+  lifecycle {
+    ignore_changes = [egress_security_rules]
+  }
 }
 
 resource "oci_core_security_list" "workers" {
@@ -175,6 +179,10 @@ resource "oci_core_security_list" "workers" {
   ingress_security_rules {
     protocol = "all"
     source   = local.vcn_cidr
+  }
+
+  lifecycle {
+    ignore_changes = [ingress_security_rules]
   }
 }
 
@@ -318,4 +326,3 @@ resource "oci_core_volume_attachment" "postgres" {
   is_shareable    = false
   volume_id       = oci_core_volume.postgres.id
 }
-
