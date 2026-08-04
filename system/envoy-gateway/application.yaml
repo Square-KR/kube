@@ -19,6 +19,9 @@ spec:
     chart: gateway-helm
     helm:
       releaseName: envoy-gateway
+      valuesObject:
+        crds:
+          enabled: false
 
   destination:
     server: https://kubernetes.default.svc
