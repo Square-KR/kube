@@ -89,6 +89,7 @@ spec:
                       - public
                 collect_bloat_metrics: true
                 collect_wal_metrics: true
+                data_directory: /var/lib/postgresql/16/main
                 collect_checksum_metrics: true
                 reported_hostname: squarek8s-postgresql
                 tags:
