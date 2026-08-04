@@ -1,0 +1,4 @@
+compartment_id      = "ocid1.tenancy.oc1..example"
+admin_cidr          = "203.0.113.10/32"
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+

@@ -1,29 +1,30 @@
-# 노드 세팅
+# Square-KR Kubernetes
 
-```yaml
-tls-san:
-  - (마스터 노드 IP)
-flannel-backend: none
-disable-network-policy: true
-disable:
-  - traefik
-# 기본 설치 과정 이후, 설정 파일 수정
+OCI OKE와 ArgoCD App-of-Apps로 운영하는 Kubernetes GitOps 저장소다.
+
+## 인프라 생성
+
+OCI CLI의 `k8s-tf` API 키 프로필과 Object Storage 상태 버킷을 준비한 뒤 실행한다.
+
+```bash
+cd terraform
+cp backend.hcl.example backend.hcl
+cp terraform.tfvars.example terraform.tfvars
+terraform init -backend-config=backend.hcl
+terraform plan -out=squarek8s.tfplan
+terraform apply squarek8s.tfplan
 ```
 
-```sh
-sudo systemctl disable --now firewalld
-# OS 레벨 방화벽 미사용
+`terraform output -raw kubeconfig_command`가 출력하는 명령으로 kubeconfig를 만든다.
+
+## 클러스터 부트스트랩
+
+```bash
+export KUBECONFIG=~/.kube/oke-squarek8s
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+./bootstrap.sh
 ```
 
-## 개발 환경
-
-기본적인 kubectl + kubectx 세팅 이후, `sh bootstrap.sh` 실행
-
-```sh
-helm plugin install https://github.com/databus23/helm-diff
-# helm 파일 diff 비교 플러그인 설치
-```
-
-## LB 세팅
-
-- NLB "소스 IP 보존" 비활성화 필수 -> 어차피 Cloudflare Proxied 상태 시, 헤더에 IP를 내려주기 때문에 필요 X
+OKE가 Flannel CNI를 제공하며, 외부 트래픽은 Envoy Gateway와 OCI Flexible Load Balancer를 사용한다.
+로드밸런서가 준비되면 Cloudflare의 `sqr.kr`, `*.sqr.kr` proxied A 레코드를 새 공인 IP로 변경한다.

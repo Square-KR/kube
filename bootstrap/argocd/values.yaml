@@ -10,11 +10,3 @@ configs:
         - .spec.dataFrom[].find | .conversionStrategy, .decodingStrategy
   params:
     server.insecure: true
-
-server:
-  httproute:
-    enabled: true
-    parentRefs:
-      - name: http
-        namespace: infra
-        sectionName: sqr-kr-wildcard-https

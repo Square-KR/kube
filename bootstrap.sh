@@ -25,14 +25,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 1. Install Cilium CNI
-log "Installing Cilium CNI..."
-helmfile apply --file "$SCRIPT_DIR/bootstrap/cilium/helmfile.yaml" --quiet
-
-log "Waiting for Cilium to be ready..."
-kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=cilium-agent -n kube-system --timeout=300s
-
-# 2. Install ArgoCD
+# 1. Install ArgoCD
 log "Installing ArgoCD..."
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 helmfile apply --file "$SCRIPT_DIR/bootstrap/argocd/helmfile.yaml" --quiet
@@ -40,7 +33,7 @@ helmfile apply --file "$SCRIPT_DIR/bootstrap/argocd/helmfile.yaml" --quiet
 log "Waiting for ArgoCD to be ready..."
 kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
 
-# 3. Create AWS SSM credentials secret
+# 2. Create AWS SSM credentials secret
 log "Creating AWS SSM credentials secret..."
 kubectl create secret generic aws-ssm-credentials \
   --namespace kube-system \
@@ -48,7 +41,7 @@ kubectl create secret generic aws-ssm-credentials \
   --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# 4. Apply root application
+# 3. Apply root application
 log "Applying root application..."
 kubectl apply -f "$SCRIPT_DIR/root.yaml"
 

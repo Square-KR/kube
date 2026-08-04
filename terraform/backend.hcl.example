@@ -1,0 +1,6 @@
+namespace           = "your-object-storage-namespace"
+bucket              = "squarek8s-terraform-state"
+key                 = "infra/terraform.tfstate"
+region              = "ap-seoul-1"
+config_file_profile = "k8s-tf"
+

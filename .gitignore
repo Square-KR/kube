@@ -1,2 +1,10 @@
 .sisyphus
 .vscode
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+backend.hcl
+terraform.tfvars
+.kubeconfig
+crash.log

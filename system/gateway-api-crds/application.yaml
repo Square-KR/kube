@@ -15,11 +15,11 @@ spec:
 
   sources:
     - repoURL: https://github.com/kubernetes-sigs/gateway-api
-      targetRevision: v1.2.0
+      targetRevision: v1.6.1
       path: config/crd/standard
 
     - repoURL: https://github.com/kubernetes-sigs/gateway-api
-      targetRevision: v1.2.0
+      targetRevision: v1.6.1
       path: config/crd/experimental
       directory:
         include: gateway.networking.k8s.io_tlsroutes.yaml
