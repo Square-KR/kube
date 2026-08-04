@@ -42,6 +42,12 @@ spec:
       tolerations:
         - operator: Exists
     clusterAgent:
+      env:
+        - name: DD_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: datadog-secret
+              key: postgres-password
       volumes:
         - name: cluster-agent-confd
           emptyDir: {}
