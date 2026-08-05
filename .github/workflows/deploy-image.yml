@@ -25,7 +25,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     concurrency:
-      group: deploy-${{ github.event.client_payload.service || inputs.service }}-${{ github.event.client_payload.environment || inputs.environment }}
+      group: deploy-${{ github.event.client_payload.service || inputs.service }}
       cancel-in-progress: false
 
     steps:
