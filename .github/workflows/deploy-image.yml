@@ -56,27 +56,38 @@ jobs:
           fi
 
           VALUES_FILE="projects/${SERVICE}/${ENVIRONMENT}/values.yaml"
+          KUSTOMIZATION_FILE="projects/${SERVICE}/${ENVIRONMENT}/kustomization.yaml"
 
           if [[ ! -f "$VALUES_FILE" ]]; then
             echo "Missing values file: $VALUES_FILE" >&2
             exit 1
           fi
 
-          echo "service=$SERVICE" >> "$GITHUB_OUTPUT"
-          echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "values_file=$VALUES_FILE" >> "$GITHUB_OUTPUT"
+          {
+            echo "service=$SERVICE"
+            echo "environment=$ENVIRONMENT"
+            echo "version=$VERSION"
+            echo "values_file=$VALUES_FILE"
+            echo "kustomization_file=$KUSTOMIZATION_FILE"
+            [[ -f "$KUSTOMIZATION_FILE" ]] && echo "has_kustomization=true" || true
+          } >> "$GITHUB_OUTPUT"
 
       - name: Update image version
         uses: mikefarah/yq@v4.46.1
         with:
           cmd: yq -i '.image.version = "${{ steps.payload.outputs.version }}"' '${{ steps.payload.outputs.values_file }}'
 
+      - name: Update workload image version
+        if: steps.payload.outputs.has_kustomization == 'true'
+        uses: mikefarah/yq@v4.46.1
+        with:
+          cmd: yq -i '.images[0].newTag = "${{ steps.payload.outputs.version }}"' '${{ steps.payload.outputs.kustomization_file }}'
+
       - name: Commit and push changes
         run: |
           set -euo pipefail
 
-          if git diff --quiet -- "${{ steps.payload.outputs.values_file }}"; then
+          if git diff --quiet; then
             echo "No image update needed."
             exit 0
           fi
@@ -84,5 +95,8 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git add "${{ steps.payload.outputs.values_file }}"
+          if [[ -f "${{ steps.payload.outputs.kustomization_file }}" ]]; then
+            git add "${{ steps.payload.outputs.kustomization_file }}"
+          fi
           git commit -m "chore(bot): update ${{ steps.payload.outputs.service }} image to ${{ steps.payload.outputs.version }}"
           git push origin main

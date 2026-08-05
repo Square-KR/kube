@@ -1,11 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: notification-backend
+  name: packet-plus-backend
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: projects
-    app.kubernetes.io/component: notification-service
+    app.kubernetes.io/component: packet-plus
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -16,13 +16,14 @@ spec:
     - list:
         elements:
           - env: dev
+          - env: prod
 
   template:
     metadata:
-      name: notification-backend-{{.env}}
+      name: packet-plus-backend-{{.env}}
       labels:
         app.kubernetes.io/part-of: projects
-        app.kubernetes.io/component: notification-service
+        app.kubernetes.io/component: packet-plus
         app.kubernetes.io/instance: "{{.env}}"
       finalizers:
         - resources-finalizer.argocd.argoproj.io
@@ -38,15 +39,13 @@ spec:
           targetRevision: HEAD
           path: charts/app
           helm:
-            releaseName: notification-backend
+            releaseName: packet-plus-backend
             valueFiles:
-              - $repo/projects/notification-backend/{{.env}}/values.yaml
+              - $repo/projects/packet-plus-backend/{{.env}}/values.yaml
 
         - repoURL: https://github.com/Square-KR/kube
           targetRevision: HEAD
-          path: projects/notification-backend/{{.env}}
-          directory:
-            exclude: values.yaml
+          path: projects/packet-plus-backend/{{.env}}
 
       destination:
         server: https://kubernetes.default.svc

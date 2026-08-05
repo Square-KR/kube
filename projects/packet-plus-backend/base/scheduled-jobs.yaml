@@ -1,0 +1,125 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: packet-plus-billing-renewal
+spec:
+  schedule: "0 10 * * *"
+  timeZone: Asia/Seoul
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: packet-plus-backend
+            app.kubernetes.io/name: packet-plus-backend
+            app.kubernetes.io/component: billing-renewal
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          imagePullSecrets:
+            - name: ghcr-pull-secret
+          containers:
+            - name: billing-renewal
+              image: ghcr.io/square-kr/packet-plus-backend:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - node
+                - --enable-source-maps
+                - --import
+                - ./dist/instrument.js
+                - dist/billing-renewal.js
+              envFrom:
+                - secretRef:
+                    name: packet-plus-backend
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "256Mi"
+                limits:
+                  memory: "256Mi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: 64Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: packet-plus-server-expiration
+spec:
+  schedule: "0 11 * * *"
+  timeZone: Asia/Seoul
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: packet-plus-backend
+            app.kubernetes.io/name: packet-plus-backend
+            app.kubernetes.io/component: server-expiration
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          imagePullSecrets:
+            - name: ghcr-pull-secret
+          containers:
+            - name: server-expiration
+              image: ghcr.io/square-kr/packet-plus-backend:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - node
+                - --enable-source-maps
+                - --import
+                - ./dist/instrument.js
+                - dist/server-expiration.js
+              envFrom:
+                - secretRef:
+                    name: packet-plus-backend
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "256Mi"
+                limits:
+                  memory: "256Mi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: 64Mi

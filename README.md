@@ -78,7 +78,7 @@ export AWS_SECRET_ACCESS_KEY=...
 
 ### 6. DNS와 최종 확인
 
-Envoy LoadBalancer의 공인 IP를 확인한 뒤 Cloudflare의 `sqr.kr`, `*.sqr.kr` proxied A 레코드를 변경한다.
+Envoy LoadBalancer의 공인 IP를 확인한 뒤 Cloudflare의 `sqr.kr`, `*.sqr.kr`, `dev-api.packet.plus`, `api.packet.plus` proxied A 레코드를 변경한다.
 
 ```bash
 kubectl get gateway -n infra

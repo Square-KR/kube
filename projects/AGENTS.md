@@ -9,14 +9,19 @@
 ```text
 projects/
 ├── _application.yaml
-└── notification-backend/
+├── notification-backend/
+│   ├── applicationset.yaml
+│   └── dev/
+│       ├── external-secret.yaml
+│       └── values.yaml
+└── packet-plus-backend/
     ├── applicationset.yaml
-    └── dev/
-        ├── external-secret.yaml
-        └── values.yaml
+    ├── base/
+    ├── dev/
+    └── prod/
 ```
 
-현재 워킹 트리 기준으로 서비스 정의는 `notification-backend` 하나이며, 환경 디렉터리는 `dev`만 존재한다.
+현재 서비스 정의는 `notification-backend/dev`, `packet-plus-backend/dev·prod`다.
 
 ## FILE RESPONSIBILITIES
 
@@ -39,6 +44,15 @@ projects/
 - 현재 health check:
   - liveness: `/healthz`
   - readiness: `/readyz`
+
+### `packet-plus-backend`
+
+- Helm release name: `packet-plus-backend`
+- 배포 namespace: `dev`, `prod`
+- image: `ghcr.io/square-kr/packet-plus-backend`
+- health check: `/health/live`, `/health/ready`
+- Kustomize base가 migration Job과 결제 갱신·서버 만료 CronJob을 소유한다.
+- API hostname: `dev-api.packet.plus`, `api.packet.plus`
 
 ## HOW A SERVICE IS WIRED
 
@@ -97,7 +111,7 @@ projects/
 - namespace는 환경명과 동일하게 쓴다.
 - 서비스 워크로드는 직접 작성하지 않고 `charts/app`을 통해 Rollout으로 배포한다.
 - 공통 GHCR 인증은 `system/external-secrets/ghcr-pull-secret.yaml`에서 관리한다.
-- 환경별 매니페스트 디렉터리에는 `values.yaml`을 제외한 추가 리소스만 두고, `applicationset.yaml`에서 `directory.exclude: values.yaml`로 분리한다.
+- 환경별 Kustomization이 없을 때는 `values.yaml`을 `directory.exclude`로 제외하고, 있으면 Kustomize가 명시한 리소스만 렌더링한다.
 
 ## DO NOT
 

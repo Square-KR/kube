@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE=".env"
-PREFIX="/dev/example-project"   # SSM 경로 prefix
+ENV_FILE="${ENV_FILE:-.env}"
+PREFIX="${PREFIX:-/dev/example-project}"   # SSM 경로 prefix
 KMS_KEY_ID="alias/aws/ssm"           # KMS 키
 
 while IFS= read -r line || [[ -n "$line" ]]; do

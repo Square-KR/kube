@@ -43,3 +43,17 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+
+    - name: packet-plus-wildcard-https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.packet.plus"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: packet-plus-wildcard-tls
+      allowedRoutes:
+        namespaces:
+          from: All
