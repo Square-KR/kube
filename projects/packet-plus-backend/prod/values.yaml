@@ -5,7 +5,7 @@ healthCheck:
   timeoutSeconds: 2
 image:
   name: ghcr.io/square-kr/packet-plus-backend
-  version: 08afa7e0690a821eb35b57973b1fef8e181cfe45
+  version: 35f2de856f2487488f8c077a9ed18c2182d97c38
 resources:
   cpu: "100m"
   memory: "256Mi"
