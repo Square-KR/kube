@@ -7,4 +7,4 @@ resources:
   - httproute.yaml
 images:
   - name: ghcr.io/square-kr/packet-plus-backend
-    newTag: latest
+    newTag: 08afa7e0690a821eb35b57973b1fef8e181cfe45
