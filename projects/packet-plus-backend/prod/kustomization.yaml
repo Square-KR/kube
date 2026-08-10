@@ -7,4 +7,4 @@ resources:
   - httproute.yaml
 images:
   - name: ghcr.io/square-kr/packet-plus-backend
-    newTag: "cff5d580"
+    newTag: "50617403"
