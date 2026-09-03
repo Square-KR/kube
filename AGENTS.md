@@ -32,7 +32,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 | 시스템 컴포넌트 수정 | `system/` | Gateway API CRD, cert-manager, Envoy Gateway, External Secrets, Rollouts, Reloader |
 | 공통 게이트웨이 수정 | `networking/gateway/` | `infra` 네임스페이스의 Gateway/HTTPRoute와 OCI LB 설정 |
 | 모니터링 수정 | `observability/datadog/` | Datadog operator, DatadogAgent, PostgreSQL DBM |
-| 서비스 배포 수정 | `projects/` | `notification-backend/dev`, `packet-plus-backend/dev·prod` |
+| 서비스 배포 수정 | `projects/` | `notification-backend/dev`, `packet-plus-backend/prod` |
 | 공통 앱 템플릿 수정 | `charts/app/` | Rollout, Service, HPA, PDB |
 | PostgreSQL 운영 | `docs/postgresql.md` | Terraform 이후 수동 설치·복구·튜닝 절차 |
 
@@ -101,7 +101,7 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 - 서비스 워크로드는 `Deployment` 대신 공통 chart의 Argo `Rollout`을 사용한다.
 - 서비스 차이는 `projects/{service}/{env}/values.yaml`에서 오버라이드한다.
 - 서비스별 환경 폴더에는 보통 `values.yaml`, `external-secret.yaml`만 두고 필요할 때만 매니페스트를 추가한다.
-- 현재 서비스는 `notification-backend/dev`, `packet-plus-backend/dev·prod`다.
+- 현재 서비스는 `notification-backend/dev`, `packet-plus-backend/prod`다.
 
 ## POSTGRESQL AND TAILSCALE
 
@@ -193,6 +193,6 @@ ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_p
 - 문서 언어는 한국어로 유지한다.
 - 현재 kubeconfig는 `~/.kube/oke-squarek8s` 하나를 기준으로 사용한다.
 - `helmfile diff`에는 `helm-diff` 플러그인이 필요하다.
-- Cloudflare는 `sqr.kr`, `*.sqr.kr`, `dev-api.packet.plus`, `api.packet.plus`을 Envoy LoadBalancer 공인 IP로 proxied 처리한다.
+- Cloudflare는 `sqr.kr`, `*.sqr.kr`, `api.packet.plus`을 Envoy LoadBalancer 공인 IP로 proxied 처리한다.
 - Envoy LoadBalancer나 Bastion을 재생성하면 공인 IP가 바뀔 수 있다. DB private IP `10.20.0.45`는 Terraform에 고정되어 있다.
 - PostgreSQL 자동 백업과 HA는 현재 구성하지 않았다.

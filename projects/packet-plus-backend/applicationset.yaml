@@ -15,7 +15,6 @@ spec:
   generators:
     - list:
         elements:
-          - env: dev
           - env: prod
 
   template:

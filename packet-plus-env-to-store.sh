@@ -16,10 +16,6 @@ for key in APP_ENV DATABASE_URL BETTER_AUTH_URL FRONTEND_ORIGIN NOTIFICATION_BAS
   }
 done
 
-read -r -s -p "packet_plus_dev_backend 비밀번호: " dev_password
-printf '\n'
-[[ -n "$dev_password" ]] || { echo "dev 비밀번호가 비어 있습니다." >&2; exit 1; }
-
 read -r -s -p "packet_plus_prod_backend 비밀번호: " prod_password
 printf '\n'
 [[ -n "$prod_password" ]] || { echo "prod 비밀번호가 비어 있습니다." >&2; exit 1; }
@@ -28,13 +24,11 @@ urlencode() {
   python3 -c 'import sys; from urllib.parse import quote; print(quote(sys.stdin.read(), safe=""), end="")'
 }
 
-dev_password_encoded="$(printf '%s' "$dev_password" | urlencode)"
 prod_password_encoded="$(printf '%s' "$prod_password" | urlencode)"
-unset dev_password prod_password
+unset prod_password
 
-dev_database_url="postgresql://packet_plus_dev_backend:${dev_password_encoded}@10.20.0.45:5432/packet_plus_dev?sslmode=require"
 prod_database_url="postgresql://packet_plus_prod_backend:${prod_password_encoded}@10.20.0.45:5432/packet_plus_prod?sslmode=require"
-unset dev_password_encoded prod_password_encoded
+unset prod_password_encoded
 
 render_env() {
   local app_env="$1"
@@ -69,27 +63,18 @@ upload() {
 }
 
 upload \
-  "/dev/packet-plus-backend" \
-  "development" \
-  "$dev_database_url" \
-  "https://dev-api.packet.plus" \
-  "https://dev.packet.plus"
-
-upload \
   "/prod/packet-plus-backend" \
   "production" \
   "$prod_database_url" \
   "https://api.packet.plus" \
   "https://packet.plus"
 
-unset dev_database_url prod_database_url
+unset prod_database_url
 
-for prefix in /dev/packet-plus-backend /prod/packet-plus-backend; do
-  echo "Stored parameters: ${prefix}"
-  aws ssm get-parameters-by-path \
-    --path "$prefix" \
-    --recursive \
-    --region "$REGION" \
-    --query 'Parameters[].Name' \
-    --output text | tr '\t' '\n' | sort
-done
+echo "Stored parameters: /prod/packet-plus-backend"
+aws ssm get-parameters-by-path \
+  --path "/prod/packet-plus-backend" \
+  --recursive \
+  --region "$REGION" \
+  --query 'Parameters[].Name' \
+  --output text | tr '\t' '\n' | sort
