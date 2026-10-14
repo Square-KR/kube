@@ -78,6 +78,8 @@ packages_from_values | while IFS= read -r package; do
   deletable_json="$(
     jq --slurpfile protected <(jq -R . "$protected_tags_file" | jq -s .) --argjson keep "$KEEP" '
       add
+      # ponytail: keep untagged child manifests; reclaim only with manifest reference tracking.
+      | map(select((.metadata.container.tags // []) | length > 0))
       | sort_by(.created_at) | reverse
       | to_entries
       | map(.value + {rank: (.key + 1)})
