@@ -9,18 +9,14 @@
 ```text
 projects/
 ├── _application.yaml
-├── notification-backend/
-│   ├── applicationset.yaml
-│   └── dev/
-│       ├── external-secret.yaml
-│       └── values.yaml
-└── packet-plus-backend/
+└── notification-backend/
     ├── applicationset.yaml
-    ├── base/
-    └── prod/
+    └── dev/
+        ├── external-secret.yaml
+        └── values.yaml
 ```
 
-현재 서비스 정의는 `notification-backend/dev`, `packet-plus-backend/prod`다.
+현재 서비스 정의는 `notification-backend/dev`다.
 
 ## FILE RESPONSIBILITIES
 
@@ -43,15 +39,6 @@ projects/
 - 현재 health check:
   - liveness: `/healthz`
   - readiness: `/readyz`
-
-### `packet-plus-backend`
-
-- Helm release name: `packet-plus-backend`
-- 배포 namespace: `prod`
-- image: `ghcr.io/square-kr/packet-plus-backend`
-- health check: `/health/live`, `/health/ready`
-- Kustomize base가 migration Job과 결제 갱신·서버 만료 CronJob을 소유한다.
-- API hostname: `api.packet.plus`
 
 ## HOW A SERVICE IS WIRED
 
