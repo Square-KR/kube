@@ -8,3 +8,17 @@ resources:
 images:
   - name: ghcr.io/square-kr/packet-plus-backend
     newTag: "50617403"
+# 프로젝트 재개 시 아래 중지용 패치를 제거한다.
+patches:
+  - target:
+      kind: CronJob
+    patch: |-
+      - op: add
+        path: /spec/suspend
+        value: true
+  - patch: |-
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: packet-plus-database-migration
+      $patch: delete

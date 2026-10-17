@@ -1,3 +1,5 @@
+# 프로젝트 중지: 재개할 때 replicas를 1로 복원한다.
+replicas: 0
 port: 3000
 healthCheck:
   liveness: /health/live
