@@ -173,6 +173,7 @@ resource "oci_core_security_list" "public" {
     }
   }
 
+  # OCI Cloud Controller가 LoadBalancer용 규칙을 추가하므로 Terraform이 되돌리지 않게 한다.
   lifecycle {
     ignore_changes = [egress_security_rules]
   }
@@ -220,6 +221,7 @@ resource "oci_core_security_list" "workers" {
     source   = local.vcn_cidr
   }
 
+  # OCI Cloud Controller가 LoadBalancer용 규칙을 추가하므로 Terraform이 되돌리지 않게 한다.
   lifecycle {
     ignore_changes = [ingress_security_rules]
   }
@@ -347,6 +349,11 @@ resource "oci_core_instance" "bastion" {
     boot_volume_size_in_gbs = 50
     source_id               = data.oci_core_images.bastion.images[0].id
     source_type             = "image"
+  }
+
+  # 최신 이미지로 바뀐 source_id를 apply하면 부트 볼륨이 교체되어 PostgreSQL과 Tailscale 설치가 사라진다.
+  lifecycle {
+    ignore_changes = [source_details[0].source_id]
   }
 }
 
