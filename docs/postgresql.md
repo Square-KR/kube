@@ -11,12 +11,14 @@
 | PostgreSQL | 16 |
 | 데이터 볼륨 | OCI Block Volume 50 GB, ext4, `/var/lib/postgresql` |
 | 내부 주소 | `10.20.0.45:5432` |
-| 접근 범위 | OKE 워커 서브넷 `10.20.1.0/24`만 허용 |
+| 접근 범위 | OKE 워커 서브넷 `10.20.1.0/24`, Tailscale `100.64.0.0/10` |
 | 인증 | TLS + SCRAM-SHA-256 |
 | 애플리케이션 DB | `square_notification` |
-| 애플리케이션 역할 | `notification_backend` |
+| 애플리케이션 역할 | `notification_backend` (DB 소유자) |
+| 모니터링 역할 | `square_datadog` (`pg_monitor`, superuser 아님) |
+| 원격 관리자 역할 | `square_admin` (superuser, 비밀번호는 로컬 macOS 키체인 `squarek8s-postgresql`) |
 
-Terraform은 인스턴스와 볼륨을 생성·연결하지만 PostgreSQL 설치, 파일시스템, DB 계정, 스키마와 SSM 값은 만들지 않는다.
+Terraform은 인스턴스와 볼륨을 생성·연결하지만 PostgreSQL 설치, 파일시스템, DB 계정, 스키마, Tailscale과 SSM 값은 만들지 않는다. Bastion 부트 이미지는 `ignore_changes`로 고정되어 있으므로 최신 Ubuntu 이미지가 나와도 부트 볼륨이 교체되지 않는다. 인스턴스를 의도적으로 재생성하면 이 문서의 절차를 처음부터 다시 수행한다.
 
 ## 신규 설치
 
@@ -112,10 +114,11 @@ timezone = 'UTC'
 log_timezone = 'UTC'
 ```
 
-`/etc/postgresql/16/main/pg_hba.conf` 끝에 OKE 워커용 규칙 하나만 추가한다.
+`/etc/postgresql/16/main/pg_hba.conf` 끝에 OKE 워커와 Tailscale 규칙을 추가한다.
 
 ```conf
 hostssl all all 10.20.1.0/24 scram-sha-256
+hostssl all all 100.64.0.0/10 scram-sha-256
 ```
 
 ```bash
@@ -182,7 +185,82 @@ sudo apt install -y iptables-persistent
 sudo netfilter-persistent save
 ```
 
-`5`는 현재 OCI Ubuntu 이미지 기준 위치다. 실행 전 출력에서 TCP REJECT 규칙의 번호를 확인해 그 번호로 바꾼다. 같은 ACCEPT 규칙을 중복 생성하지 않는다.
+`5`는 현재 OCI Ubuntu 이미지 기준 위치다. 실행 전 출력에서 TCP REJECT 규칙의 번호를 확인해 그 번호로 바꾼다. 같은 ACCEPT 규칙을 중복 생성하지 않는다. 공인 IP의 5432는 열지 않는다. Tailscale 트래픽은 Tailscale이 추가하는 `ts-input` 체인에서 허용된다.
+
+### 6. 역할과 데이터베이스
+
+비밀번호는 명령행이나 저장소에 남기지 않도록 `\password`로 입력한다.
+
+```bash
+sudo -u postgres psql
+```
+
+```sql
+CREATE ROLE notification_backend LOGIN;
+\password notification_backend
+CREATE DATABASE square_notification OWNER notification_backend;
+
+CREATE ROLE square_admin LOGIN SUPERUSER;
+\password square_admin
+```
+
+- `notification_backend` 접속 정보는 애플리케이션 SSM 경로 `/dev/notification-backend/...`에 저장한다.
+- `square_admin` 비밀번호는 노트북의 macOS 키체인에만 저장한다.
+
+```bash
+security add-generic-password -a square_admin -s squarek8s-postgresql -w
+```
+
+### 7. Datadog DBM 역할
+
+`square_notification` DB에 접속해 모니터링 역할과 실행 계획 수집 함수를 만든다.
+
+```bash
+sudo -u postgres psql -d square_notification
+```
+
+```sql
+CREATE ROLE square_datadog LOGIN INHERIT;
+\password square_datadog
+GRANT pg_monitor TO square_datadog;
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+CREATE SCHEMA datadog;
+GRANT USAGE ON SCHEMA datadog TO square_datadog;
+GRANT USAGE ON SCHEMA public TO square_datadog;
+
+CREATE OR REPLACE FUNCTION datadog.explain_statement(l_query text, OUT explain json)
+ RETURNS SETOF json
+ LANGUAGE plpgsql
+ STRICT SECURITY DEFINER
+AS $function$
+DECLARE
+  curs refcursor;
+  plan json;
+BEGIN
+  SET TRANSACTION READ ONLY;
+  OPEN curs FOR EXECUTE pg_catalog.concat('EXPLAIN (FORMAT JSON) ', l_query);
+  FETCH curs INTO plan;
+  CLOSE curs;
+  RETURN QUERY SELECT plan;
+END;
+$function$;
+```
+
+같은 비밀번호를 AWS SSM `/infrastructure/datadog/postgresql-password`에 저장하면 `observability/datadog/external-secret.yaml`이 Agent에 주입한다.
+
+### 8. Tailscale subnet router
+
+노트북에서 VCN 내부 주소로 접근하기 위해 이 인스턴스를 subnet router로 사용한다.
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n' \
+  | sudo tee /etc/sysctl.d/99-tailscale.conf
+sudo sysctl -p /etc/sysctl.d/99-tailscale.conf
+sudo tailscale up --hostname=squarek8s-db-router --advertise-routes=10.20.0.0/16
+```
+
+Tailscale 관리 콘솔에서 장치의 `10.20.0.0/16` route를 승인한다. 현재 장치의 MagicDNS 이름은 `db-router-01`이다.
 
 ## 검증
 
@@ -205,7 +283,15 @@ kubectl get rollout,pods -n dev
 kubectl logs -n dev -l app=notification-backend --tail=100
 ```
 
-정상 기준은 PostgreSQL `active`, `pg_isready` accepting connections, THP `[never]`, ArgoCD 전체 `Synced/Healthy`, notification-backend 파드 Ready다.
+노트북에서 Tailscale 경로를 확인한다.
+
+```bash
+nc -vz 10.20.0.45 5432
+PGPASSWORD=$(security find-generic-password -a square_admin -s squarek8s-postgresql -w) \
+  psql "host=10.20.0.45 dbname=square_notification user=square_admin sslmode=require" -c 'SELECT 1'
+```
+
+정상 기준은 PostgreSQL `active`, `pg_isready` accepting connections, THP `[never]`, Tailscale 경유 접속 성공, ArgoCD 전체 `Synced/Healthy`, notification-backend 파드 Ready, Datadog의 `postgresql` 통합 정상이다.
 
 ## 백업과 복원
 
@@ -215,7 +301,7 @@ Terraform state는 DB 백업이 아니며 현재 자동 백업과 HA는 없다. 
 sudo -u postgres pg_dump -Fc square_notification > square_notification.dump
 ```
 
-백업 파일을 인스턴스 밖의 안전한 저장소로 옮긴다. 새 DB와 역할을 만든 뒤 복원한다.
+백업 파일을 인스턴스 밖의 안전한 저장소로 옮긴다. 위의 역할과 데이터베이스 절차로 새 DB와 역할을 만든 뒤 복원한다.
 
 ```bash
 sudo -u postgres pg_restore --clean --if-exists --no-owner \

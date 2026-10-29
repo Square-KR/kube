@@ -78,7 +78,7 @@ packages_from_values | while IFS= read -r package; do
   deletable_json="$(
     jq --slurpfile protected <(jq -R . "$protected_tags_file" | jq -s .) --argjson keep "$KEEP" '
       add
-      # ponytail: keep untagged child manifests; reclaim only with manifest reference tracking.
+      # 태그 없는 버전은 multi-arch 이미지의 플랫폼별 child manifest일 수 있어 삭제하지 않는다.
       | map(select((.metadata.container.tags // []) | length > 0))
       | sort_by(.created_at) | reverse
       | to_entries

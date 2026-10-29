@@ -19,6 +19,9 @@
 ## DEFAULT VALUES
 
 ```yaml
+nameOverride: ""
+fullnameOverride: ""
+
 replicas: 1
 
 port: 3000
@@ -27,6 +30,7 @@ healthCheck:
   port: ""
   liveness: /healthz/liveness
   readiness: /healthz/readiness
+  timeoutSeconds: 1
 
 image:
   name: ""
@@ -69,6 +73,8 @@ pdb:
 - `revisionHistoryLimit: 2`
 - `topologySpreadConstraints`를 기본으로 걸어 노드 분산을 시도한다.
 - 전략은 `blueGreen.activeService=<fullname>`
+- Pod는 `restricted` Pod Security를 통과하도록 non-root, `RuntimeDefault` seccomp, 읽기 전용 루트 파일시스템, 모든 capability drop으로 실행한다. 쓰기가 필요하면 메모리 기반 `/tmp`(64Mi)를 사용한다.
+- ServiceAccount 토큰은 마운트하지 않는다.
 
 ### `service.yaml`
 

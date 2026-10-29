@@ -1,21 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 log() { echo -e "${GREEN}[✓]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 error() { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 
-# Check prerequisites
 command -v kubectl >/dev/null 2>&1 || error "kubectl not found"
 command -v helmfile >/dev/null 2>&1 || error "helmfile not found"
 
-# Check AWS credentials
 if [[ -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
   error "AWS_ACCESS_KEY_ID environment variable is required"
 fi
@@ -45,7 +42,6 @@ kubectl create secret generic aws-ssm-credentials \
 log "Applying root application..."
 kubectl apply -f "$SCRIPT_DIR/root.yaml"
 
-# Done
 echo ""
 log "Bootstrap complete! ArgoCD will now sync all applications."
 echo ""

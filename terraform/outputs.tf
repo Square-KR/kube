@@ -9,19 +9,23 @@ output "kubeconfig_command" {
 }
 
 output "bastion_public_ip" {
-  value = oci_core_instance.bastion.public_ip
+  description = "Bastion and PostgreSQL host public IP"
+  value       = oci_core_instance.bastion.public_ip
 }
 
 output "bastion_private_ip" {
-  value = oci_core_instance.bastion.private_ip
+  description = "Bastion and PostgreSQL host private IP"
+  value       = oci_core_instance.bastion.private_ip
 }
 
 output "postgres_volume_id" {
-  value = oci_core_volume.postgres.id
+  description = "PostgreSQL data block volume OCID"
+  value       = oci_core_volume.postgres.id
 }
 
 output "load_balancer_subnet_id" {
-  value = oci_core_subnet.public.id
+  description = "Subnet used by OCI Load Balancers"
+  value       = oci_core_subnet.public.id
 }
 
 output "envoy_lb_nsg_id" {

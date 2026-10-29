@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
+# .env 파일의 KEY=VALUE를 AWS SSM Parameter Store SecureString으로 올린다.
+# 사용법: PREFIX=/dev/notification-backend ENV_FILE=.env scripts/env-to-ssm.sh
 set -euo pipefail
 
 ENV_FILE="${ENV_FILE:-.env}"
-PREFIX="${PREFIX:-/dev/example-project}"   # SSM 경로 prefix
-KMS_KEY_ID="alias/aws/ssm"           # KMS 키
+PREFIX="${PREFIX:-}"
+KMS_KEY_ID="${KMS_KEY_ID:-alias/aws/ssm}"
+AWS_REGION="ap-northeast-2"
+
+if [[ ! "$PREFIX" =~ ^/[a-z0-9-]+/[a-z0-9-]+$ ]]; then
+  echo "PREFIX must look like /{env}/{service} or /infrastructure/{name}: '${PREFIX}'" >&2
+  exit 1
+fi
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Missing env file: ${ENV_FILE}" >&2
+  exit 1
+fi
 
 while IFS= read -r line || [[ -n "$line" ]]; do
   line="${line//$'\r'/}"
 
-  # 공백/주석 스킵
   [[ -z "${line// }" ]] && continue
   [[ "$line" =~ ^[[:space:]]*# ]] && continue
 
-  # "export KEY=VALUE" 형태도 지원
   line="${line#export }"
 
-  # KEY=VALUE 형태만 처리
   if [[ "$line" != *"="* ]]; then
     continue
   fi
@@ -23,11 +33,9 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   key="${line%%=*}"
   val="${line#*=}"
 
-  # 양끝 공백 제거
   key="$(printf '%s' "$key" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   val="$(printf '%s' "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 
-  # 따옴표로 감싼 값이면 바깥 따옴표 제거
   if [[ "$val" =~ ^\".*\"$ ]]; then val="${val:1:${#val}-2}"; fi
   if [[ "$val" =~ ^\'.*\'$ ]]; then val="${val:1:${#val}-2}"; fi
 
@@ -39,7 +47,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     --type "SecureString" \
     --key-id "$KMS_KEY_ID" \
     --overwrite \
-    --region ap-northeast-2
-    
+    --region "$AWS_REGION" >/dev/null
+
   echo "OK: $name"
 done < "$ENV_FILE"

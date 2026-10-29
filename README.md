@@ -6,11 +6,12 @@ OCI OKE와 ArgoCD App-of-Apps로 운영하는 Kubernetes GitOps 저장소다.
 
 | 구성 | 사양 |
 |---|---|
-| OKE | Basic Cluster, Flannel CNI |
+| OKE | Basic Cluster, Kubernetes `v1.36.4`, Flannel CNI |
 | 워커 | `VM.Standard.A1.Flex` 2대, 각 1 OCPU / 8 GiB / 50 GB |
-| Bastion + PostgreSQL | `VM.Standard.A1.Flex` 1대, 2 OCPU / 8 GiB / 부트 50 GB |
+| Bastion + PostgreSQL | `VM.Standard.A1.Flex` 1대, 2 OCPU / 8 GiB / 부트 50 GB, `10.20.0.45` |
 | PostgreSQL 데이터 | OCI Block Volume 50 GB |
-| 인그레스 | Envoy Gateway + OCI Flexible Load Balancer |
+| 인그레스 | Envoy Gateway + OCI Flexible Load Balancer, Cloudflare IP만 허용하는 NSG |
+| 원격 DB 관리 | Tailscale subnet router `10.20.0.0/16` |
 | Terraform state | OCI Object Storage 원격 backend |
 
 ## 새 클러스터 구축
@@ -29,6 +30,7 @@ OCI OKE와 ArgoCD App-of-Apps로 운영하는 Kubernetes GitOps 저장소다.
   - `/infrastructure/ghcr/token`
   - `/infrastructure/cloudflare/api-token`
   - `/infrastructure/datadog/api-key`
+  - `/infrastructure/datadog/postgresql-password`
 
 ```bash
 oci iam region list --profile k8s-tf >/dev/null
@@ -53,6 +55,12 @@ terraform apply squarek8s.tfplan
 
 기존 환경을 이어서 관리할 때는 반드시 기존 Object Storage state를 사용한다. 빈 state로 실행하면 동일 자원을 새로 만들려고 한다.
 
+Envoy LoadBalancer NSG를 새로 만들었으면 OCID를 `networking/gateway/envoy.yaml`의 `oci.oraclecloud.com/oci-network-security-groups`에 반영하고 push한다. 이 값이 틀리면 LoadBalancer가 Cloudflare 트래픽을 받지 못한다.
+
+```bash
+terraform output -raw envoy_lb_nsg_id
+```
+
 ### 3. kubeconfig 생성
 
 ```bash
@@ -63,7 +71,7 @@ kubectl get nodes
 
 ### 4. PostgreSQL 준비
 
-[PostgreSQL 운영 문서](docs/postgresql.md)의 신규 설치와 튜닝 절차를 수행하고, 기존 데이터가 있으면 애플리케이션을 배포하기 전에 복원한다. DB 역할·스키마·SSM 값 생성은 이 저장소에서 관리하지 않는다.
+[PostgreSQL 운영 문서](docs/postgresql.md)의 신규 설치, 튜닝, 역할, Tailscale 절차를 수행하고, 기존 데이터가 있으면 애플리케이션을 배포하기 전에 복원한다. DB 역할·스키마·SSM 값은 Terraform이나 ArgoCD가 만들지 않는다.
 
 ### 5. GitOps 부트스트랩
 
@@ -93,9 +101,19 @@ kubectl get pods -A
 
 - Object Storage의 Terraform state는 인프라 목록이지 PostgreSQL 데이터 백업이 아니다.
 - `terraform destroy`는 PostgreSQL Block Volume도 제거한다. 필요한 데이터는 먼저 `pg_dump`로 백업한다.
-- OKE Kubernetes 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OCI에서 더 이상 지원하지 않으면 현재 지원 버전과 이미지로 갱신한 뒤 plan을 확인한다.
+- OKE Kubernetes 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OCI에서 더 이상 지원하지 않으면 현재 지원 버전과 이미지로 갱신한 뒤 plan을 확인한다. 제어 플레인은 minor 버전 단위로 올린다. 진행 예시는 [OKE 업그레이드 기록](docs/incidents/2026-10-09-oke-upgrade.md)에 있다.
+- 업그레이드 후 `projects/*/applicationset.yaml`의 Pod Security `*-version` 라벨도 클러스터 버전에 맞춘다.
 - Bastion 공인 IP와 Envoy LoadBalancer IP는 재생성 시 바뀔 수 있다. PostgreSQL 내부 주소 `10.20.0.45`는 Terraform에 고정되어 있다.
 - PostgreSQL 자동 백업과 HA는 현재 구성하지 않았다.
+- 워커 `/var/log/messages` 보존 정책이 작은 루트 디스크에 맞지 않아 DiskPressure가 반복된다. [DiskPressure 기록](docs/incidents/2026-09-10-disk-pressure.md)의 재발 방지 계획은 아직 적용하지 않았다.
+
+## 서비스 시크릿 등록
+
+서비스 시크릿은 `/{env}/{service}/{KEY}` 경로의 SSM SecureString으로 둔다. `.env` 파일을 한 번에 올릴 때는 다음 스크립트를 사용한다.
+
+```bash
+PREFIX=/dev/notification-backend ENV_FILE=.env scripts/env-to-ssm.sh
+```
 
 ## 운영 접속
 

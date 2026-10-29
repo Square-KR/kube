@@ -86,7 +86,7 @@ projects/
 
 ### 기존 서비스 수정
 
-- 이미지 태그 변경: `{env}/values.yaml`
+- 이미지 태그 변경: `{env}/values.yaml`의 `image.version`. 보통 서비스 저장소가 `deploy-image` `repository_dispatch`(`service`, `environment`, `version`)를 보내 `.github/workflows/deploy-image.yml`이 커밋한다. 이미지는 `linux/arm64`를 포함해야 한다.
 - 포트/프로브 변경: `{env}/values.yaml`
 - 환경변수 추가: `{env}/values.yaml`의 `env`
 - secret 매핑 추가: `{env}/external-secret.yaml`
@@ -97,7 +97,8 @@ projects/
 - namespace는 환경명과 동일하게 쓴다.
 - 서비스 워크로드는 직접 작성하지 않고 `charts/app`을 통해 Rollout으로 배포한다.
 - 공통 GHCR 인증은 `system/external-secrets/ghcr-pull-secret.yaml`에서 관리한다.
-- 환경별 Kustomization이 없을 때는 `values.yaml`을 `directory.exclude`로 제외하고, 있으면 Kustomize가 명시한 리소스만 렌더링한다.
+- 환경 디렉터리 source는 `directory.exclude: values.yaml`로 Helm values를 제외한 나머지 매니페스트를 그대로 적용한다. Kustomize는 사용하지 않는다.
+- ApplicationSet `managedNamespaceMetadata`의 Pod Security `*-version` 라벨은 클러스터 Kubernetes minor 버전과 맞춘다. 현재 `v1.36`이다.
 
 ## DO NOT
 

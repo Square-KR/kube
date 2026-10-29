@@ -56,7 +56,6 @@ jobs:
           fi
 
           VALUES_FILE="projects/${SERVICE}/${ENVIRONMENT}/values.yaml"
-          KUSTOMIZATION_FILE="projects/${SERVICE}/${ENVIRONMENT}/kustomization.yaml"
 
           if [[ ! -f "$VALUES_FILE" ]]; then
             echo "Missing values file: $VALUES_FILE" >&2
@@ -68,20 +67,12 @@ jobs:
             echo "environment=$ENVIRONMENT"
             echo "version=$VERSION"
             echo "values_file=$VALUES_FILE"
-            echo "kustomization_file=$KUSTOMIZATION_FILE"
-            [[ -f "$KUSTOMIZATION_FILE" ]] && echo "has_kustomization=true" || true
           } >> "$GITHUB_OUTPUT"
 
       - name: Update image version
         uses: mikefarah/yq@v4.46.1
         with:
           cmd: yq -i '.image.version = "${{ steps.payload.outputs.version }}"' '${{ steps.payload.outputs.values_file }}'
-
-      - name: Update workload image version
-        if: steps.payload.outputs.has_kustomization == 'true'
-        uses: mikefarah/yq@v4.46.1
-        with:
-          cmd: yq -i '.images[0].newTag = "${{ steps.payload.outputs.version }}"' '${{ steps.payload.outputs.kustomization_file }}'
 
       - name: Commit and push changes
         run: |
@@ -95,8 +86,5 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git add "${{ steps.payload.outputs.values_file }}"
-          if [[ -f "${{ steps.payload.outputs.kustomization_file }}" ]]; then
-            git add "${{ steps.payload.outputs.kustomization_file }}"
-          fi
           git commit -m "chore(bot): update ${{ steps.payload.outputs.service }} image to ${{ steps.payload.outputs.version }}"
           git push origin main

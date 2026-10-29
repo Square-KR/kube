@@ -8,6 +8,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 
 ```text
 .
+├── .github/workflows/  # 이미지 태그 갱신(deploy-image), GHCR 정리(cleanup-ghcr)
 ├── terraform/          # OCI VCN, OKE, 워커, Bastion/DB, Block Volume
 ├── bootstrap/          # ArgoCD Helmfile
 ├── system/             # Gateway API CRD, cert-manager, Envoy Gateway, External Secrets 등
@@ -15,7 +16,10 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 ├── observability/      # Datadog operator, Agent, PostgreSQL DBM
 ├── projects/           # 서비스 배포 정의
 ├── charts/app/         # 공통 Argo Rollout 애플리케이션 Helm chart
-├── docs/postgresql.md  # PostgreSQL 설치, 튜닝, 운영 및 복구
+├── scripts/            # GHCR 정리와 테스트, .env → SSM 업로드
+├── docs/
+│   ├── postgresql.md   # PostgreSQL 설치, 튜닝, 역할, Tailscale, 복구
+│   └── incidents/      # 날짜별 장애·작업 기록
 ├── root.yaml           # 최상위 ArgoCD root Application
 └── bootstrap.sh        # ArgoCD 설치, AWS 자격 증명 Secret, root 적용
 ```
@@ -34,14 +38,18 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 | 모니터링 수정 | `observability/datadog/` | Datadog operator, DatadogAgent, PostgreSQL DBM |
 | 서비스 배포 수정 | `projects/` | `notification-backend/dev` |
 | 공통 앱 템플릿 수정 | `charts/app/` | Rollout, Service, HPA, PDB |
-| PostgreSQL 운영 | `docs/postgresql.md` | Terraform 이후 수동 설치·복구·튜닝 절차 |
+| PostgreSQL 운영 | `docs/postgresql.md` | Terraform 이후 수동 설치·역할·Tailscale·복구 절차 |
+| 이미지 배포 자동화 | `.github/workflows/deploy-image.yml` | `repository_dispatch`로 `projects/{service}/{env}/values.yaml`의 `image.version` 갱신 |
+| GHCR 정리 | `.github/workflows/cleanup-ghcr.yml`, `scripts/cleanup-ghcr.sh` | 배포 중 태그·`latest`·태그 없는 child manifest 보존 |
+| SSM 시크릿 업로드 | `scripts/env-to-ssm.sh` | `.env`를 `/{env}/{service}/{KEY}` SecureString으로 저장 |
+| 과거 장애·작업 | `docs/incidents/` | DiskPressure, OKE 업그레이드 기록 |
 
 ## CURRENT INFRASTRUCTURE
 
 | 항목 | 현재 값 |
 |---|---|
 | OCI 리전 | `ap-seoul-1` |
-| OKE | Basic Cluster, Kubernetes `v1.33.10`, Flannel Overlay |
+| OKE | Basic Cluster, Kubernetes `v1.36.4`, Flannel Overlay |
 | 워커 | `VM.Standard.A1.Flex` 2대, 각 1 OCPU / 8 GiB / 50 GB |
 | VCN | `10.20.0.0/16` |
 | Public subnet | `10.20.0.0/24` |
@@ -56,13 +64,16 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 
 ## DEPLOYMENT FLOW
 
+`root`가 도메인별 App-of-Apps를 아래 wave 순서로 만든다.
+
 | Wave | 구성 | 목적 |
 |---|---|---|
-| 0 | Gateway API CRD, cert-manager | Gateway 리소스와 인증서 선행 |
-| 1 | `system/*` | Envoy Gateway, External Secrets, Reloader, Argo Rollouts |
-| 2 | `networking/*` | Gateway와 HTTP → HTTPS redirect |
-| 4 | `observability/*` | Datadog과 PostgreSQL DBM |
-| 5 | `projects/*` | 서비스 워크로드 |
+| 1 | `system` | 클러스터 공통 컴포넌트 |
+| 2 | `networking` | Gateway와 HTTP → HTTPS redirect |
+| 4 | `observability` | Datadog과 PostgreSQL DBM |
+| 5 | `projects` | 서비스 워크로드 |
+
+`system` 내부에서는 Gateway API CRD, cert-manager, Argo Rollouts, Reloader가 wave 0, Envoy Gateway와 External Secrets가 wave 1이다.
 
 ## REPO CONVENTIONS
 
@@ -109,9 +120,10 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 - 애플리케이션 DB/역할은 `square_notification` / `notification_backend`다.
 - Datadog 역할은 `square_datadog`이며 superuser가 아니다.
 - 노트북용 원격 관리자 역할은 `square_admin`이다. 비밀번호는 저장소나 SSM이 아니라 로컬 macOS 키체인의 서비스 `squarek8s-postgresql`에 저장되어 있다.
-- Tailscale 장치 이름은 `squarek8s-db-router`이고 `10.20.0.0/16`을 subnet route로 광고하며 승인된 상태다.
+- Tailscale 호스트 이름은 `squarek8s-db-router`, MagicDNS 이름은 `db-router-01`이다. `10.20.0.0/16`을 subnet route로 광고하며 승인된 상태다.
 - 서버는 IPv4/IPv6 forwarding이 활성화되어 있고 PostgreSQL은 Tailscale CGNAT 대역 `100.64.0.0/10`에 TLS + SCRAM 접속을 허용한다.
-- Terraform은 PostgreSQL 설치, 역할, 데이터, Tailscale을 구성하지 않는다. Bastion을 재생성하면 `docs/postgresql.md` 절차와 Tailscale 설치·route 승인을 다시 수행한다.
+- Terraform은 PostgreSQL 설치, 역할, 데이터, Tailscale을 구성하지 않는다. Bastion을 재생성하면 `docs/postgresql.md` 절차 전체를 다시 수행한다.
+- Bastion `source_details[0].source_id`는 `ignore_changes`다. Ubuntu 이미지 data source가 최신 이미지를 가리켜도 부트 볼륨이 교체되지 않게 하기 위함이므로 제거하지 않는다.
 
 ```bash
 # 노트북에서 PostgreSQL 관리자 비밀번호 조회
@@ -155,6 +167,8 @@ ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_p
 | 운영 리소스를 `kubectl edit`로 상시 수정 | Git 변경 후 ArgoCD sync |
 | 공인 IP로 PostgreSQL 5432 개방 | Tailscale route 사용 |
 | Envoy Service의 NSG annotation 제거 | Cloud Controller가 공개 security list 규칙을 다시 만들 수 있으므로 NSG와 `None` 모드 유지 |
+| Bastion의 이미지 `ignore_changes` 제거 | 부트 볼륨 교체로 PostgreSQL 설치가 사라지므로 유지 |
+| 서비스에 `kustomization.yaml` 추가 | 이미지 갱신 워크플로우는 `values.yaml`의 `image.version`만 수정한다 |
 
 ## USEFUL COMMANDS
 
@@ -186,6 +200,9 @@ kubectl get gateway -n infra
 
 # PostgreSQL 서버 접속
 ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_public_ip)
+
+# GHCR 정리 스크립트 테스트
+scripts/test-cleanup-ghcr.sh
 ```
 
 ## REMINDERS
@@ -196,3 +213,7 @@ ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_p
 - Cloudflare는 `sqr.kr`, `*.sqr.kr`을 Envoy LoadBalancer 공인 IP로 proxied 처리한다.
 - Envoy LoadBalancer나 Bastion을 재생성하면 공인 IP가 바뀔 수 있다. DB private IP `10.20.0.45`는 Terraform에 고정되어 있다.
 - PostgreSQL 자동 백업과 HA는 현재 구성하지 않았다.
+- Envoy NSG OCID는 `networking/gateway/envoy.yaml`에 직접 들어 있다. NSG를 재생성하면 `terraform output -raw envoy_lb_nsg_id` 값으로 갱신한다.
+- OKE 버전을 올리면 `projects/*/applicationset.yaml`의 Pod Security `*-version` 라벨도 함께 올린다.
+- 워커 DiskPressure 재발 방지(`/var/log/messages` logrotate 정책)는 아직 적용되지 않았다. `docs/incidents/2026-09-10-disk-pressure.md` 참고.
+- `prod` 네임스페이스는 현재 워크로드 없이 `ghcr-pull-secret`만 있다.
