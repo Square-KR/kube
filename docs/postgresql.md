@@ -18,7 +18,7 @@
 | 모니터링 역할 | `square_datadog` (`pg_monitor`, superuser 아님) |
 | 원격 관리자 역할 | `square_admin` (superuser, 비밀번호는 로컬 macOS 키체인 `squarek8s-postgresql`) |
 
-Terraform은 인스턴스와 볼륨을 생성·연결하지만 PostgreSQL 설치, 파일시스템, DB 계정, 스키마, Tailscale과 SSM 값은 만들지 않는다. Bastion 부트 이미지는 `ignore_changes`로 고정되어 있으므로 최신 Ubuntu 이미지가 나와도 부트 볼륨이 교체되지 않는다. 인스턴스를 의도적으로 재생성하면 이 문서의 절차를 처음부터 다시 수행한다.
+Terraform은 인스턴스와 볼륨을 생성·연결하지만 PostgreSQL 설치, 파일시스템, DB 계정, 스키마, Tailscale, Datadog 호스트 Agent와 SSM 값은 만들지 않는다. Bastion 부트 이미지는 `ignore_changes`로 고정되어 있으므로 최신 Ubuntu 이미지가 나와도 부트 볼륨이 교체되지 않는다. 인스턴스를 의도적으로 재생성하면 이 문서의 절차를 처음부터 다시 수행한다.
 
 ## 신규 설치
 
@@ -261,6 +261,33 @@ sudo tailscale up --hostname=squarek8s-db-router --advertise-routes=10.20.0.0/16
 ```
 
 Tailscale 관리 콘솔에서 장치의 `10.20.0.0/16` route를 승인한다. 현재 장치의 MagicDNS 이름은 `db-router-01`이다.
+
+### 9. Datadog 호스트 Agent
+
+PostgreSQL 지표와 DBM은 클러스터의 cluster check가 원격으로 수집한다. 이 인스턴스의 CPU, 메모리, swap, `/var/lib/postgresql` 디스크 사용률은 호스트에 설치한 Agent가 수집한다. 호스트 이름을 cluster check의 `reported_hostname`과 같은 `squarek8s-postgresql`로 맞춰 Datadog에서 한 호스트로 묶는다. postgres 체크는 호스트 Agent에 설정하지 않는다.
+
+API key는 화면에 출력하지 않고 클러스터 Secret에서 SSH 표준입력으로 넘긴다. 노트북의 저장소 루트에서 실행한다.
+
+```bash
+kubectl -n datadog get secret datadog-secret -o jsonpath='{.data.api-key}' | base64 -d \
+  | ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_public_ip) '
+      IFS= read -r DD_API_KEY || true
+      export DD_API_KEY DD_SITE=us5.datadoghq.com DD_HOSTNAME=squarek8s-postgresql DD_HOST_TAGS="env:dev,service:postgresql"
+      curl -fsSL https://install.datadoghq.com/scripts/install_script_agent7.sh -o /tmp/dd-install.sh
+      sudo -E bash /tmp/dd-install.sh && rm -f /tmp/dd-install.sh'
+```
+
+이 호스트에는 트레이스를 보내는 애플리케이션이 없으므로 `/etc/datadog-agent/datadog.yaml` 끝에 APM 비활성화를 추가하고 재시작한다.
+
+```yaml
+apm_config:
+  enabled: false
+```
+
+```bash
+sudo systemctl restart datadog-agent
+sudo datadog-agent status | grep -E 'hostname:|API Key|\[(OK|ERROR)\]'
+```
 
 ## 검증
 

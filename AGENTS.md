@@ -123,7 +123,7 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 - 노트북용 원격 관리자 역할은 `square_admin`이다. 비밀번호는 저장소나 SSM이 아니라 로컬 macOS 키체인의 서비스 `squarek8s-postgresql`에 저장되어 있다.
 - Tailscale 호스트 이름은 `squarek8s-db-router`, MagicDNS 이름은 `db-router-01`이다. `10.20.0.0/16`을 subnet route로 광고하며 승인된 상태다.
 - 서버는 IPv4/IPv6 forwarding이 활성화되어 있고 PostgreSQL은 Tailscale CGNAT 대역 `100.64.0.0/10`에 TLS + SCRAM 접속을 허용한다.
-- Terraform은 PostgreSQL 설치, 역할, 데이터, Tailscale을 구성하지 않는다. Bastion을 재생성하면 `docs/postgresql.md` 절차 전체를 다시 수행한다.
+- Terraform은 PostgreSQL 설치, 역할, 데이터, Tailscale, Datadog 호스트 Agent를 구성하지 않는다. Bastion을 재생성하면 `docs/postgresql.md` 절차 전체를 다시 수행한다.
 - Bastion `source_details[0].source_id`는 `ignore_changes`다. Ubuntu 이미지 data source가 최신 이미지를 가리켜도 부트 볼륨이 교체되지 않게 하기 위함이므로 제거하지 않는다.
 
 ```bash
@@ -145,6 +145,7 @@ ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_p
 - `relations.relation_regex: .*`로 모든 relation을 자동 수집한다.
 - relation, bloat, WAL, checksum metrics와 DBM이 활성화되어 있다.
 - Agent 비밀번호는 ExternalSecret을 통해 `/infrastructure/datadog/postgresql-password`에서 가져온다.
+- PostgreSQL 호스트(`10.20.0.45`)에는 Datadog Agent 7을 systemd 서비스로 설치했다. 호스트 이름은 `squarek8s-postgresql`로 cluster check의 `reported_hostname`과 같고, CPU·메모리·디스크 등 호스트 지표만 수집한다. APM은 꺼져 있고 postgres 체크는 두지 않는다. Terraform과 GitOps 밖의 수동 구성이므로 Bastion 재생성 시 `docs/postgresql.md`의 Datadog 호스트 Agent 절차를 다시 수행한다.
 
 ## NETWORK SECURITY
 
