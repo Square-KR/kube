@@ -105,7 +105,7 @@ kubectl get pods -A
 - 업그레이드 후 `projects/*/applicationset.yaml`의 Pod Security `*-version` 라벨도 클러스터 버전에 맞춘다.
 - Bastion 공인 IP와 Envoy LoadBalancer IP는 재생성 시 바뀔 수 있다. PostgreSQL 내부 주소 `10.20.0.45`는 Terraform에 고정되어 있다.
 - PostgreSQL 자동 백업과 HA는 현재 구성하지 않았다.
-- 워커 `/var/log/messages` 보존 정책이 작은 루트 디스크에 맞지 않아 DiskPressure가 반복된다. [DiskPressure 기록](docs/incidents/2026-09-10-disk-pressure.md)의 재발 방지 계획은 아직 적용하지 않았다.
+- 워커 루트 파일시스템은 약 30 GiB라 `/var/log/messages`가 쌓이면 DiskPressure가 난다. `terraform/worker-init.sh`가 node pool user_data로 보존 정책을 설치한다. 배경은 [DiskPressure 기록](docs/incidents/2026-09-10-disk-pressure.md)에 있다.
 
 ## 서비스 시크릿 등록
 

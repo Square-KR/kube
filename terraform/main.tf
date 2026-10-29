@@ -292,6 +292,10 @@ resource "oci_containerengine_node_pool" "workers" {
   freeform_tags      = local.tags
   ssh_public_key     = file(pathexpand(var.ssh_public_key_path))
 
+  node_metadata = {
+    user_data = base64encode(file("${path.module}/worker-init.sh"))
+  }
+
   initial_node_labels {
     key   = "node-role"
     value = "worker"

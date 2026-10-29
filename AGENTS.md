@@ -9,7 +9,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 ```text
 .
 ├── .github/workflows/  # 이미지 태그 갱신(deploy-image), GHCR 정리(cleanup-ghcr)
-├── terraform/          # OCI VCN, OKE, 워커, Bastion/DB, Block Volume
+├── terraform/          # OCI VCN, OKE, 워커(worker-init.sh user_data), Bastion/DB, Block Volume
 ├── bootstrap/          # ArgoCD Helmfile
 ├── system/             # Gateway API CRD, cert-manager, Envoy Gateway, External Secrets 등
 ├── networking/         # 공통 Gateway, HTTPS, HTTP redirect, ArgoCD HTTPRoute
@@ -31,6 +31,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 | 작업 | 위치 | 메모 |
 |---|---|---|
 | OCI 인프라 수정 | `terraform/` | 원격 OCI Object Storage state 사용 |
+| 워커 노드 OS 설정 | `terraform/worker-init.sh` | OKE 기본 초기화 후 messages logrotate 정책 설치 |
 | 클러스터 부트스트랩 | `bootstrap/`, `bootstrap.sh` | ArgoCD 설치 후 AWS SSM 자격 증명과 root 적용 |
 | 루트 App-of-Apps 수정 | `root.yaml` | `**/_application.yaml`만 수집 |
 | 시스템 컴포넌트 수정 | `system/` | Gateway API CRD, cert-manager, Envoy Gateway, External Secrets, Rollouts, Reloader |
@@ -169,6 +170,7 @@ ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_p
 | Envoy Service의 NSG annotation 제거 | Cloud Controller가 공개 security list 규칙을 다시 만들 수 있으므로 NSG와 `None` 모드 유지 |
 | Bastion의 이미지 `ignore_changes` 제거 | 부트 볼륨 교체로 PostgreSQL 설치가 사라지므로 유지 |
 | 서비스에 `kustomization.yaml` 추가 | 이미지 갱신 워크플로우는 `values.yaml`의 `image.version`만 수정한다 |
+| `worker-init.sh`에서 OKE 초기화 부분 제거 | 노드가 클러스터에 조인하지 못하므로 유지 |
 
 ## USEFUL COMMANDS
 
@@ -215,5 +217,5 @@ scripts/test-cleanup-ghcr.sh
 - PostgreSQL 자동 백업과 HA는 현재 구성하지 않았다.
 - Envoy NSG OCID는 `networking/gateway/envoy.yaml`에 직접 들어 있다. NSG를 재생성하면 `terraform output -raw envoy_lb_nsg_id` 값으로 갱신한다.
 - OKE 버전을 올리면 `projects/*/applicationset.yaml`의 Pod Security `*-version` 라벨도 함께 올린다.
-- 워커 DiskPressure 재발 방지(`/var/log/messages` logrotate 정책)는 아직 적용되지 않았다. `docs/incidents/2026-09-10-disk-pressure.md` 참고.
+- 워커 `/var/log/messages` 보존 정책은 `terraform/worker-init.sh`가 설치한다. 신규 노드는 node pool user_data로 받고, 실행 중인 노드는 `sudo bash -s -- --logs-only < terraform/worker-init.sh`로 적용한다. Datadog SELinux 진단 로그 폭증과 디스크 경보는 아직 남아 있다. `docs/incidents/2026-09-10-disk-pressure.md` 참고.
 - `prod` 네임스페이스는 현재 워크로드 없이 `ghcr-pull-secret`만 있다.
