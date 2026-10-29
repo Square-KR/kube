@@ -5,8 +5,8 @@ locals {
   worker_subnet_cidr = "10.20.1.0/24"
   pod_cidr           = "10.244.0.0/16"
   service_cidr       = "10.96.0.0/16"
-  kubernetes_version = "v1.33.10"
-  oke_image_name     = "Oracle-Linux-9.8-aarch64-2026.07.20-0-OKE-1.33.10-1578"
+  kubernetes_version = "v1.36.4"
+  oke_image_name     = "Oracle-Linux-9.8-aarch64-2026.08.14-0-OKE-1.36.4-1820"
   shape              = "VM.Standard.A1.Flex"
 
   cloudflare_ipv4_cidrs = toset([
