@@ -32,8 +32,9 @@ kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=argocd-server 
 
 # 2. Create AWS SSM credentials secret
 log "Creating AWS SSM credentials secret..."
+kubectl create namespace external-secrets --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic aws-ssm-credentials \
-  --namespace kube-system \
+  --namespace external-secrets \
   --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
   --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
