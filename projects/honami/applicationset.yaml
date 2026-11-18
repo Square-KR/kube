@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: honami
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: projects
+    app.kubernetes.io/component: web-service
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - list:
+        elements:
+          - env: prod
+
+  template:
+    metadata:
+      name: honami-{{.env}}
+      labels:
+        app.kubernetes.io/part-of: projects
+        app.kubernetes.io/component: web-service
+        app.kubernetes.io/instance: "{{.env}}"
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+
+      sources:
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          ref: repo
+
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          path: charts/app
+          helm:
+            releaseName: honami
+            valueFiles:
+              - $repo/projects/honami/{{.env}}/values.yaml
+
+        - repoURL: https://github.com/Square-KR/kube
+          targetRevision: HEAD
+          path: projects/honami/{{.env}}
+          directory:
+            exclude: values.yaml
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.env}}"
+
+      syncPolicy:
+        managedNamespaceMetadata:
+          labels:
+            square-kr.io/ghcr-pull-secret: "true"
+            pod-security.kubernetes.io/enforce: restricted
+            pod-security.kubernetes.io/enforce-version: v1.36
+            pod-security.kubernetes.io/audit: restricted
+            pod-security.kubernetes.io/audit-version: v1.36
+            pod-security.kubernetes.io/warn: restricted
+            pod-security.kubernetes.io/warn-version: v1.36
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+          - CreateNamespace=true
