@@ -21,7 +21,8 @@ spec:
           isArgoRollouts: true
           reloadStrategy: annotations
           reloadOnCreate: true
-          syncAfterRestart: true
+          # annotations 전략은 이전 상태를 비교하지 않는다. true면 Reloader가 재시작할 때마다 모든 Rollout이 다시 배포된다.
+          syncAfterRestart: false
 
   destination:
     server: https://kubernetes.default.svc
