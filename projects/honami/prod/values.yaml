@@ -1,14 +1,13 @@
 port: 3000
-# Set to 1 after the first image is published. Never above 1: the school-account
-# collector and rate limits live in process memory.
-replicas: 0
+# Never above 1: the school-account collector and rate limits live in process memory.
+replicas: 1
 healthCheck:
   liveness: /api/health
   readiness: /api/health
   timeoutSeconds: 3
 image:
   name: ghcr.io/square-kr/honami
-  version: bootstrap
+  version: "102d0544"
 resources:
   cpu: "100m"
   memory: "512Mi"
