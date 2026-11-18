@@ -31,6 +31,14 @@ spec:
 
   override:
     nodeAgent:
+      # container_t로 /host/proc를 읽으면 SELinux 거부 기록이 초당 수십 건 쌓여 워커의 setroubleshootd가 CPU를 소모한다.
+      securityContext:
+        runAsUser: 0
+        seLinuxOptions:
+          user: system_u
+          role: system_r
+          type: spc_t
+          level: s0
       env:
         - name: DD_IGNORE_AUTOCONF
           value: "kubernetes_state redisdb"
