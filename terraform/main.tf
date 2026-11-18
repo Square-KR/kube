@@ -377,3 +377,34 @@ resource "oci_core_volume_attachment" "postgres" {
   is_shareable    = false
   volume_id       = oci_core_volume.postgres.id
 }
+
+# 매일 03:00 KST 증분 백업을 7일, 일요일 백업을 4주 보존한다.
+resource "oci_core_volume_backup_policy" "postgres" {
+  compartment_id = var.compartment_id
+  display_name   = "squarek8s-postgres-backup"
+  freeform_tags  = local.tags
+
+  schedules {
+    backup_type       = "INCREMENTAL"
+    period            = "ONE_DAY"
+    offset_type       = "STRUCTURED"
+    hour_of_day       = 18
+    time_zone         = "UTC"
+    retention_seconds = 7 * 24 * 60 * 60
+  }
+
+  schedules {
+    backup_type       = "INCREMENTAL"
+    period            = "ONE_WEEK"
+    offset_type       = "STRUCTURED"
+    day_of_week       = "SATURDAY"
+    hour_of_day       = 18
+    time_zone         = "UTC"
+    retention_seconds = 28 * 24 * 60 * 60
+  }
+}
+
+resource "oci_core_volume_backup_policy_assignment" "postgres" {
+  asset_id  = oci_core_volume.postgres.id
+  policy_id = oci_core_volume_backup_policy.postgres.id
+}
