@@ -19,6 +19,7 @@ spec:
       valuesObject:
         reloader:
           isArgoRollouts: true
+          reloadStrategy: annotations
           reloadOnCreate: true
           syncAfterRestart: true
 

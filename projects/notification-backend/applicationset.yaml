@@ -52,6 +52,16 @@ spec:
         server: https://kubernetes.default.svc
         namespace: "{{.env}}"
 
+      # Argo Rollouts와 Reloader가 쓰는 필드다. selfHeal이 지우면 blue-green 전환과 시크릿 재시작이 되돌려진다.
+      ignoreDifferences:
+        - kind: Service
+          jsonPointers:
+            - /spec/selector/rollouts-pod-template-hash
+        - group: argoproj.io
+          kind: Rollout
+          jsonPointers:
+            - /spec/template/metadata/annotations/reloader.stakater.com~1last-reloaded-from
+
       syncPolicy:
         managedNamespaceMetadata:
           labels:
@@ -68,3 +78,4 @@ spec:
         syncOptions:
           - ServerSideApply=true
           - CreateNamespace=true
+          - RespectIgnoreDifferences=true
