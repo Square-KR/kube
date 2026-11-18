@@ -13,12 +13,13 @@
 | 내부 주소 | `10.20.0.45:5432` |
 | 접근 범위 | OKE 워커 서브넷 `10.20.1.0/24`, Tailscale `100.64.0.0/10` |
 | 인증 | TLS + SCRAM-SHA-256 |
-| 애플리케이션 DB | `square_notification` |
-| 애플리케이션 역할 | `notification_backend` (DB 소유자) |
+| 애플리케이션 DB | `square_notification`, `honami` |
+| 애플리케이션 역할 | `notification_backend`, `honami` (각 DB 소유자) |
 | 모니터링 역할 | `square_datadog` (`pg_monitor`, superuser 아님) |
+| 백업 | Block Volume 백업 정책 `squarek8s-postgres-backup` (매일 03:00 KST 증분 7일, 일요일 백업 4주 보존) |
 | 원격 관리자 역할 | `square_admin` (superuser, 비밀번호는 로컬 macOS 키체인 `squarek8s-postgresql`) |
 
-Terraform은 인스턴스와 볼륨을 생성·연결하지만 PostgreSQL 설치, 파일시스템, DB 계정, 스키마, Tailscale, Datadog 호스트 Agent와 SSM 값은 만들지 않는다. Bastion 부트 이미지는 `ignore_changes`로 고정되어 있으므로 최신 Ubuntu 이미지가 나와도 부트 볼륨이 교체되지 않는다. 인스턴스를 의도적으로 재생성하면 이 문서의 절차를 처음부터 다시 수행한다.
+Terraform은 인스턴스와 볼륨, 볼륨 백업 정책을 만들지만 PostgreSQL 설치, 파일시스템, DB 계정, 스키마, Tailscale, Datadog 호스트 Agent와 SSM 값은 만들지 않는다. Bastion 부트 이미지는 `ignore_changes`로 고정되어 있으므로 최신 Ubuntu 이미지가 나와도 부트 볼륨이 교체되지 않는다. 인스턴스를 의도적으로 재생성하면 이 문서의 절차를 처음부터 다시 수행한다.
 
 ## 신규 설치
 
@@ -213,7 +214,7 @@ security add-generic-password -a square_admin -s squarek8s-postgresql -w
 
 ### 7. Datadog DBM 역할
 
-`square_notification` DB에 접속해 모니터링 역할과 실행 계획 수집 함수를 만든다.
+모니터링 역할은 한 번만 만든다. `datadog` 스키마, 권한, 실행 계획 수집 함수는 모니터링할 DB마다(`square_notification`, `honami`, `postgres`) 접속해 만든다. `CREATE ROLE`과 `\password`는 첫 DB에서만 실행하고, `pg_stat_statements` 확장은 `postgres` DB에는 만들지 않아도 된다.
 
 ```bash
 sudo -u postgres psql -d square_notification
@@ -246,7 +247,7 @@ END;
 $function$;
 ```
 
-같은 비밀번호를 AWS SSM `/infrastructure/datadog/postgresql-password`에 저장하면 `observability/datadog/external-secret.yaml`이 Agent에 주입한다.
+같은 비밀번호를 AWS SSM `/infrastructure/datadog/postgresql-password`에 저장한다. 9번 절차에서 호스트 Agent 설정에 이 값을 쓴다.
 
 ### 8. Tailscale subnet router
 
@@ -264,7 +265,7 @@ Tailscale 관리 콘솔에서 장치의 `10.20.0.0/16` route를 승인한다. �
 
 ### 9. Datadog 호스트 Agent
 
-PostgreSQL 지표와 DBM은 클러스터의 cluster check가 원격으로 수집한다. 이 인스턴스의 CPU, 메모리, swap, `/var/lib/postgresql` 디스크 사용률은 호스트에 설치한 Agent가 수집한다. 호스트 이름을 cluster check의 `reported_hostname`과 같은 `squarek8s-postgresql`로 맞춰 Datadog에서 한 호스트로 묶는다. postgres 체크는 호스트 Agent에 설정하지 않는다.
+이 인스턴스의 Agent가 호스트 지표(CPU, 메모리, swap, `/var/lib/postgresql` 디스크)와 PostgreSQL 지표·DBM을 모두 수집한다. Datadog는 자체 호스팅 DB를 DB 호스트의 Agent로 모니터링하도록 안내한다. 호스트 이름은 `squarek8s-postgresql`이다.
 
 API key는 화면에 출력하지 않고 클러스터 Secret에서 SSH 표준입력으로 넘긴다. 노트북의 저장소 루트에서 실행한다.
 
@@ -288,6 +289,43 @@ apm_config:
 sudo systemctl restart datadog-agent
 sudo datadog-agent status | grep -E 'hostname:|API Key|\[(OK|ERROR)\]'
 ```
+
+postgres 체크를 설정한다. 비밀번호는 화면에 출력하지 않고 SSM에서 SSH 표준입력으로 넘긴다. 비밀번호에 `"`나 `\`가 있으면 YAML 이스케이프가 필요하다.
+
+```bash
+aws ssm get-parameter --name /infrastructure/datadog/postgresql-password --with-decryption \
+  --region ap-northeast-2 --query Parameter.Value --output text \
+  | ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_public_ip) '
+      IFS= read -r PGPW || true
+      tmp=$(mktemp)
+      cat > "$tmp" <<EOF
+init_config:
+instances:
+  - host: 127.0.0.1
+    port: 5432
+    username: square_datadog
+    password: "$PGPW"
+    dbname: square_notification
+    database_autodiscovery:
+      enabled: true
+      include:
+        - square_notification$
+        - honami$
+    ssl: require
+    dbm: true
+    relations:
+      - relation_regex: .*
+    collect_bloat_metrics: true
+    collect_wal_metrics: true
+    data_directory: /var/lib/postgresql/16/main
+    collect_checksum_metrics: true
+EOF
+      sudo install -o dd-agent -g dd-agent -m 600 "$tmp" /etc/datadog-agent/conf.d/postgres.d/conf.yaml
+      rm -f "$tmp"
+      sudo systemctl restart datadog-agent'
+```
+
+모니터링할 DB를 추가하면 7번 절차로 그 DB에 `datadog` 스키마와 함수를 만들고 `include`에 이름을 넣는다. `dbname`에는 `pg_stat_statements` 확장이 있는 DB를 둔다.
 
 ## 검증
 
@@ -318,11 +356,15 @@ PGPASSWORD=$(security find-generic-password -a square_admin -s squarek8s-postgre
   psql "host=10.20.0.45 dbname=square_notification user=square_admin sslmode=require" -c 'SELECT 1'
 ```
 
-정상 기준은 PostgreSQL `active`, `pg_isready` accepting connections, THP `[never]`, Tailscale 경유 접속 성공, ArgoCD 전체 `Synced/Healthy`, notification-backend 파드 Ready, Datadog의 `postgresql` 통합 정상이다.
+정상 기준은 PostgreSQL `active`, `pg_isready` accepting connections, THP `[never]`, Tailscale 경유 접속 성공, ArgoCD 전체 `Synced/Healthy`, notification-backend 파드 Ready, 호스트의 `sudo datadog-agent status`에서 postgres 체크 `[OK]`다.
 
 ## 백업과 복원
 
-Terraform state는 DB 백업이 아니며 현재 자동 백업과 HA는 없다. 인프라 제거 전에 수동 백업한다.
+Terraform의 `oci_core_volume_backup_policy.postgres`가 데이터 볼륨을 매일 03:00 KST에 증분 백업해 7일, 일요일 백업을 4주 보존한다. 볼륨 스냅샷이라 복원하면 PostgreSQL이 WAL로 crash recovery를 거쳐 올라온다. 논리 백업, 시점 복구(PITR), HA는 없다.
+
+볼륨 백업에서 복원할 때는 OCI 콘솔이나 CLI로 백업에서 새 볼륨을 만들고, PostgreSQL을 멈춘 뒤 기존 볼륨 대신 `/var/lib/postgresql`에 마운트한다. Terraform state의 `oci_core_volume.postgres`와 어긋나므로 복원 후 state를 새 볼륨에 맞춘다. 이 복원 절차는 아직 실제로 수행해 본 적이 없다.
+
+DB 하나만 되돌리거나 인프라를 제거하기 전에는 `pg_dump`로 수동 백업한다.
 
 ```bash
 sudo -u postgres pg_dump -Fc square_notification > square_notification.dump

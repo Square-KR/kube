@@ -69,7 +69,7 @@ pdb:
   - `OTEL_EXPORTER_OTLP_ENDPOINT=http://$(HOST_IP):4317`
 - `env` 배열은 그대로 추가한다.
 - `secrets` 배열이 있으면 `envFrom.secretRef`로 주입한다.
-- `reloader.stakater.com/auto: "true"` annotation이 항상 들어간다.
+- `reloader.stakater.com/auto: "true"` annotation이 항상 들어간다. 참조하는 Secret이 바뀌면 Reloader가 Pod template에 `reloader.stakater.com/last-reloaded-from` 어노테이션을 써서 blue-green 재배포를 일으킨다.
 - `revisionHistoryLimit: 2`
 - `topologySpreadConstraints`를 기본으로 걸어 노드 분산을 시도한다.
 - 전략은 `blueGreen.activeService=<fullname>`

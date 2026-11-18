@@ -98,6 +98,8 @@ projects/
 - 서비스 워크로드는 직접 작성하지 않고 `charts/app`을 통해 Rollout으로 배포한다.
 - 공통 GHCR 인증은 `system/external-secrets/ghcr-pull-secret.yaml`에서 관리한다.
 - 환경 디렉터리 source는 `directory.exclude: values.yaml`로 Helm values를 제외한 나머지 매니페스트를 그대로 적용한다. Kustomize는 사용하지 않는다.
+- ApplicationSet에는 Service의 `rollouts-pod-template-hash` 셀렉터와 Rollout의 `reloader.stakater.com/last-reloaded-from` 어노테이션에 대한 `ignoreDifferences`, 그리고 `RespectIgnoreDifferences=true`를 둔다. 새 서비스의 ApplicationSet에도 그대로 넣는다.
+- SSM 값을 바꾸면 ExternalSecret 갱신(최대 1시간) 뒤 Reloader가 자동으로 재배포한다. 수동 재시작은 필요 없다.
 - ApplicationSet `managedNamespaceMetadata`의 Pod Security `*-version` 라벨은 클러스터 Kubernetes minor 버전과 맞춘다. 현재 `v1.36`이다.
 
 ## DO NOT

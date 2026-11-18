@@ -7,7 +7,8 @@
 - 2026-10-09 OKE 업그레이드 중 같은 원인으로 재발했다. 자세한 내용은 [OKE 업그레이드 기록](2026-10-09-oke-upgrade.md)에 있다.
 - 위 두 노드는 업그레이드 때 `10.20.1.108`, `10.20.1.58`로 교체되었다. 교체 19일 후 루트 사용률이 각각 82%, 72%였고, messages 최근 20,000행 중 약 98%가 setroubleshoot였다.
 - 아래 계획 1을 `terraform/worker-init.sh`로 구현했다. 기존 두 노드에는 `--logs-only`로 직접 적용했고, 신규 노드는 node pool `node_metadata.user_data`로 같은 정책을 받는다. Terraform node pool 변경(in-place)은 2026-10-29에 apply했다.
-- 계획 2(Datadog SELinux 진단)와 3(경보)은 아직 적용하지 않았다. 경보는 Datadog UI에서 직접 구성하기로 했다.
+- 계획 2(Datadog SELinux 진단)는 2026-11-19에 적용했다. node Agent를 `spc_t` SELinux 타입으로 실행하자 거부 기록이 멈췄고, 두 노드의 CPU idle이 0%에서 80~90%로 돌아왔다. 그전에는 setroubleshootd가 노드당 1 vCPU의 20~35%를 상시 사용했다.
+- 계획 3(경보)은 아직 적용하지 않았다. 경보는 Datadog UI에서 직접 구성하기로 했다.
 
 ### 계획 1 적용 결과
 

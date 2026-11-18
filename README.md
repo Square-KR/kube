@@ -104,7 +104,7 @@ kubectl get pods -A
 - OKE Kubernetes 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OCI에서 더 이상 지원하지 않으면 현재 지원 버전과 이미지로 갱신한 뒤 plan을 확인한다. 제어 플레인은 minor 버전 단위로 올린다. 진행 예시는 [OKE 업그레이드 기록](docs/incidents/2026-10-09-oke-upgrade.md)에 있다.
 - 업그레이드 후 `projects/*/applicationset.yaml`의 Pod Security `*-version` 라벨도 클러스터 버전에 맞춘다.
 - Bastion 공인 IP와 Envoy LoadBalancer IP는 재생성 시 바뀔 수 있다. PostgreSQL 내부 주소 `10.20.0.45`는 Terraform에 고정되어 있다.
-- PostgreSQL 자동 백업과 HA는 현재 구성하지 않았다.
+- PostgreSQL 데이터 볼륨은 Terraform의 백업 정책으로 매일 백업한다(7일, 주간 4주 보존). 논리 백업과 HA는 구성하지 않았다.
 - 워커 루트 파일시스템은 약 30 GiB라 `/var/log/messages`가 쌓이면 DiskPressure가 난다. `terraform/worker-init.sh`가 node pool user_data로 보존 정책을 설치한다. 배경은 [DiskPressure 기록](docs/incidents/2026-09-10-disk-pressure.md)에 있다.
 
 ## 서비스 시크릿 등록

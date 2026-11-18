@@ -13,7 +13,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 ├── bootstrap/          # ArgoCD Helmfile
 ├── system/             # Gateway API CRD, cert-manager, Envoy Gateway, External Secrets 등
 ├── networking/         # 공통 Gateway, HTTPS, HTTP redirect, ArgoCD HTTPRoute
-├── observability/      # Datadog operator, Agent, PostgreSQL DBM
+├── observability/      # Datadog operator, Agent
 ├── projects/           # 서비스 배포 정의
 ├── charts/app/         # 공통 Argo Rollout 애플리케이션 Helm chart
 ├── scripts/            # GHCR 정리와 테스트, .env → SSM 업로드
@@ -36,7 +36,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 | 루트 App-of-Apps 수정 | `root.yaml` | `**/_application.yaml`만 수집 |
 | 시스템 컴포넌트 수정 | `system/` | Gateway API CRD, cert-manager, Envoy Gateway, External Secrets, Rollouts, Reloader |
 | 공통 게이트웨이 수정 | `networking/gateway/` | `infra` 네임스페이스의 Gateway/HTTPRoute와 OCI LB 설정 |
-| 모니터링 수정 | `observability/datadog/` | Datadog operator, DatadogAgent, PostgreSQL DBM |
+| 모니터링 수정 | `observability/datadog/` | Datadog operator, DatadogAgent. PostgreSQL DBM은 DB 호스트 Agent가 수집 |
 | 서비스 배포 수정 | `projects/` | `notification-backend/dev` |
 | 공통 앱 템플릿 수정 | `charts/app/` | Rollout, Service, HPA, PDB |
 | PostgreSQL 운영 | `docs/postgresql.md` | Terraform 이후 수동 설치·역할·Tailscale·복구 절차 |
@@ -58,6 +58,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 | Pod / Service CIDR | `10.244.0.0/16` / `10.96.0.0/16` |
 | Bastion + PostgreSQL | `10.20.0.45`, 2 OCPU / 8 GiB / 부트 50 GB |
 | PostgreSQL 데이터 | OCI Block Volume 50 GB, `/var/lib/postgresql` |
+| PostgreSQL 백업 | Block Volume 백업 정책 `squarek8s-postgres-backup`: 매일 03:00 KST 증분 7일, 일요일 백업 4주 보존 |
 | 인그레스 | Envoy Gateway + OCI Flexible Load Balancer 10 Mbps + Cloudflare 전용 NSG |
 | Terraform state | OCI Object Storage remote backend |
 
@@ -71,7 +72,7 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 |---|---|---|
 | 1 | `system` | 클러스터 공통 컴포넌트 |
 | 2 | `networking` | Gateway와 HTTP → HTTPS redirect |
-| 4 | `observability` | Datadog과 PostgreSQL DBM |
+| 4 | `observability` | Datadog |
 | 5 | `projects` | 서비스 워크로드 |
 
 `system` 내부에서는 Gateway API CRD, cert-manager, Argo Rollouts, Reloader가 wave 0, Envoy Gateway와 External Secrets가 wave 1이다.
@@ -90,7 +91,10 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 ### Namespace 규칙
 
 - `argocd`: ArgoCD control plane
-- `kube-system`: cert-manager, External Secrets, Reloader, Argo Rollouts
+- `cert-manager`: cert-manager. ClusterIssuer가 쓰는 `cloudflare-api-token`과 ACME 계정 키도 여기에 둔다.
+- `external-secrets`: External Secrets와 `aws-ssm-credentials`
+- `argo-rollouts`: Argo Rollouts
+- `reloader`: Reloader
 - `envoy-gateway-system`: Envoy Gateway controller와 proxy 설정
 - `infra`: 공통 Gateway와 HTTPRoute
 - `datadog`: Datadog operator와 agent
@@ -100,10 +104,10 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 ### Secret 규칙
 
 - 클러스터는 OCI에 있지만 External Secrets backend는 AWS SSM Parameter Store다.
-- 단일 `ClusterSecretStore` `aws-ssm`을 사용하며 자격 증명은 `kube-system/aws-ssm-credentials`에 둔다.
+- 단일 `ClusterSecretStore` `aws-ssm`을 사용하며 자격 증명은 `external-secrets/aws-ssm-credentials`에 둔다.
 - 서비스 시크릿은 `/{env}/{service}/{KEY}` 패턴을 사용한다.
 - 인프라 시크릿은 `/infrastructure/...` 경로를 사용한다.
-- 사용 중인 인프라 경로는 GHCR, Cloudflare, Datadog이며 PostgreSQL DBM 비밀번호는 `/infrastructure/datadog/postgresql-password`다.
+- 사용 중인 인프라 경로는 GHCR, Cloudflare, Datadog이다. `/infrastructure/datadog/postgresql-password`는 클러스터가 가져가지 않고 DB 호스트 Agent를 설정할 때만 쓴다.
 - `/infrastructure/postgresql/`와 `MAIN_IP`는 사용하지 않는다.
 - GHCR pull secret은 `system/external-secrets/ghcr-pull-secret.yaml`에서 공용으로 만든다.
 - YAML, Terraform, 문서에 비밀번호·토큰·개인 키를 하드코딩하지 않는다.
@@ -113,7 +117,9 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 - 서비스 워크로드는 `Deployment` 대신 공통 chart의 Argo `Rollout`을 사용한다.
 - 서비스 차이는 `projects/{service}/{env}/values.yaml`에서 오버라이드한다.
 - 서비스별 환경 폴더에는 보통 `values.yaml`, `external-secret.yaml`만 두고 필요할 때만 매니페스트를 추가한다.
-- 현재 서비스는 `notification-backend/dev`다.
+- 현재 서비스는 `notification-backend/dev`, `honami/prod`다.
+- ApplicationSet의 `ignoreDifferences`와 `RespectIgnoreDifferences=true`는 Argo Rollouts가 Service에 붙이는 `rollouts-pod-template-hash` 셀렉터와 Reloader의 `last-reloaded-from` 어노테이션을 selfHeal이 지우지 않게 한다. 빠지면 blue-green 전환이 깨지고 시크릿 변경 후 자동 재시작이 되돌려진다.
+- Reloader는 `annotations` 전략과 `syncAfterRestart: false`로 둔다. `true`면 Reloader가 재시작할 때마다 모든 Rollout이 다시 배포된다.
 
 ## POSTGRESQL AND TAILSCALE
 
@@ -140,12 +146,13 @@ ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_p
 
 ## DATADOG POSTGRESQL DBM
 
-- Datadog site는 `us5.datadoghq.com`이며 APM, 전체 컨테이너 로그, OTEL collector, cluster checks가 활성화되어 있다.
-- PostgreSQL cluster check는 `10.20.0.45:5432/square_notification`에 TLS로 연결한다.
-- `relations.relation_regex: .*`로 모든 relation을 자동 수집한다.
+- Datadog site는 `us5.datadoghq.com`이며 클러스터 Agent는 APM, 전체 컨테이너 로그, OTEL collector를 수집한다.
+- PostgreSQL 체크와 DBM은 클러스터가 아니라 PostgreSQL 호스트(`10.20.0.45`)의 Datadog Agent 7이 `127.0.0.1:5432`로 수집한다. 호스트 이름은 `squarek8s-postgresql`이고 CPU·메모리·디스크 지표도 같은 Agent가 보낸다. APM은 꺼져 있다.
+- 대상 DB는 `database_autodiscovery`의 include 목록인 `square_notification`, `honami`다. DB를 추가하면 그 DB에 `datadog` 스키마와 `explain_statement` 함수를 만들고 include에 넣는다.
 - relation, bloat, WAL, checksum metrics와 DBM이 활성화되어 있다.
-- Agent 비밀번호는 ExternalSecret을 통해 `/infrastructure/datadog/postgresql-password`에서 가져온다.
-- PostgreSQL 호스트(`10.20.0.45`)에는 Datadog Agent 7을 systemd 서비스로 설치했다. 호스트 이름은 `squarek8s-postgresql`로 cluster check의 `reported_hostname`과 같고, CPU·메모리·디스크 등 호스트 지표만 수집한다. APM은 꺼져 있고 postgres 체크는 두지 않는다. Terraform과 GitOps 밖의 수동 구성이므로 Bastion 재생성 시 `docs/postgresql.md`의 Datadog 호스트 Agent 절차를 다시 수행한다.
+- 설정 파일은 호스트의 `/etc/datadog-agent/conf.d/postgres.d/conf.yaml`(dd-agent 소유, 0600)이며 비밀번호는 `/infrastructure/datadog/postgresql-password`와 같은 값이다.
+- Terraform과 GitOps 밖의 수동 구성이므로 Bastion 재생성 시 `docs/postgresql.md`의 Datadog 호스트 Agent 절차를 다시 수행한다.
+- 클러스터의 node Agent는 `spc_t` SELinux 타입으로 실행한다.
 
 ## NETWORK SECURITY
 
@@ -170,6 +177,7 @@ ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_p
 | 공인 IP로 PostgreSQL 5432 개방 | Tailscale route 사용 |
 | Envoy Service의 NSG annotation 제거 | Cloud Controller가 공개 security list 규칙을 다시 만들 수 있으므로 NSG와 `None` 모드 유지 |
 | Bastion의 이미지 `ignore_changes` 제거 | 부트 볼륨 교체로 PostgreSQL 설치가 사라지므로 유지 |
+| Datadog node Agent의 `spc_t` SELinux 설정 제거 | 워커의 setroubleshootd가 거부 기록을 분석하느라 1 vCPU를 대부분 소모하므로 유지 |
 | 서비스에 `kustomization.yaml` 추가 | 이미지 갱신 워크플로우는 `values.yaml`의 `image.version`만 수정한다 |
 | `worker-init.sh`에서 OKE 초기화 부분 제거 | 노드가 클러스터에 조인하지 못하므로 유지 |
 
@@ -215,8 +223,8 @@ scripts/test-cleanup-ghcr.sh
 - `helmfile diff`에는 `helm-diff` 플러그인이 필요하다.
 - Cloudflare는 `sqr.kr`, `*.sqr.kr`을 Envoy LoadBalancer 공인 IP로 proxied 처리한다.
 - Envoy LoadBalancer나 Bastion을 재생성하면 공인 IP가 바뀔 수 있다. DB private IP `10.20.0.45`는 Terraform에 고정되어 있다.
-- PostgreSQL 자동 백업과 HA는 현재 구성하지 않았다.
+- PostgreSQL은 Block Volume 백업 정책으로 매일 백업한다. 논리 백업(`pg_dump`), PITR, HA는 구성하지 않았다. 복원 절차는 `docs/postgresql.md` 참고.
 - Envoy NSG OCID는 `networking/gateway/envoy.yaml`에 직접 들어 있다. NSG를 재생성하면 `terraform output -raw envoy_lb_nsg_id` 값으로 갱신한다.
 - OKE 버전을 올리면 `projects/*/applicationset.yaml`의 Pod Security `*-version` 라벨도 함께 올린다.
-- 워커 `/var/log/messages` 보존 정책은 `terraform/worker-init.sh`가 설치한다. 신규 노드는 node pool user_data로 받고, 실행 중인 노드는 `sudo bash -s -- --logs-only < terraform/worker-init.sh`로 적용한다. Datadog SELinux 진단 로그 폭증과 디스크 경보는 아직 남아 있다. `docs/incidents/2026-09-10-disk-pressure.md` 참고.
+- 워커 `/var/log/messages` 보존 정책은 `terraform/worker-init.sh`가 설치한다. 신규 노드는 node pool user_data로 받고, 실행 중인 노드는 `sudo bash -s -- --logs-only < terraform/worker-init.sh`로 적용한다. Datadog SELinux 진단 로그 폭증은 node Agent를 `spc_t`로 실행해 없앴다. 디스크 경보는 아직 구성하지 않았다. `docs/incidents/2026-09-10-disk-pressure.md` 참고.
 - `prod` 네임스페이스는 현재 워크로드 없이 `ghcr-pull-secret`만 있다.
