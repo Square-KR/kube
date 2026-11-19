@@ -8,9 +8,7 @@ metadata:
   annotations:
     reloader.stakater.com/auto: "true"
 spec:
-  {{- if not .Values.hpa.enabled }}
   replicas: {{ .Values.replicas }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "app.selectorLabels" . | nindent 6 }}
@@ -47,7 +45,7 @@ spec:
             - name: HOST_IP
               valueFrom:
                 fieldRef:
-                    fieldPath: status.hostIP
+                  fieldPath: status.hostIP
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://$(HOST_IP):4317"
             {{- with .Values.env }}

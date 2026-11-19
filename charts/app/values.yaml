@@ -24,13 +24,3 @@ env: []
 secrets: []
 
 imagePullSecrets: []
-
-hpa:
-  enabled: false
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 50
-
-pdb:
-  enabled: false
-  minAvailable: "50%"
