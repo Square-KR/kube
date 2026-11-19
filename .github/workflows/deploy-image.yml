@@ -30,6 +30,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate payload
         id: payload
@@ -87,4 +89,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git add "${{ steps.payload.outputs.values_file }}"
           git commit -m "chore(bot): update ${{ steps.payload.outputs.service }} image to ${{ steps.payload.outputs.version }}"
-          git push origin main
+
+          # 다른 서비스의 배포 커밋이 먼저 push되면 non-fast-forward로 거부되므로 rebase 후 다시 시도한다.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            git pull --rebase origin main
+          done
+
+          echo "Failed to push after 3 attempts" >&2
+          exit 1
