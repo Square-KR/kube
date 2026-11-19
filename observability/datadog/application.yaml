@@ -14,7 +14,7 @@ spec:
   sources:
     - chart: datadog-operator
       repoURL: https://helm.datadoghq.com
-      targetRevision: 2.14.1
+      targetRevision: 2.32.0
 
     - repoURL: https://github.com/Square-KR/kube
       targetRevision: HEAD
