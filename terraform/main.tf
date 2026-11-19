@@ -164,15 +164,6 @@ resource "oci_core_security_list" "public" {
     }
   }
 
-  ingress_security_rules {
-    protocol = "6"
-    source   = local.worker_subnet_cidr
-    tcp_options {
-      min = 5432
-      max = 5432
-    }
-  }
-
   # Envoy Service를 security-rule-management-mode None으로 바꾸기 전에 OCI Cloud Controller가 추가한 NodePort 규칙이 남아 있다.
   # VCN 전체 허용 규칙과 겹쳐 영향은 없으며, 정리할 때까지 Terraform이 이 차이를 되돌리지 않게 한다.
   lifecycle {

@@ -186,7 +186,7 @@ sudo reboot
 
 ### 5. 네트워크 제한
 
-OCI Security List는 Terraform이 `10.20.1.0/24 -> TCP 5432`만 허용한다. Ubuntu iptables에도 같은 ACCEPT 규칙을 기본 REJECT 규칙보다 앞에 추가하고 영구 저장한다.
+OCI public security list는 VCN `10.20.0.0/16` 내부 트래픽을 모두 허용하고, 공인 인터넷에는 5432를 열지 않는다. 워커 서브넷만 받도록 제한하는 것은 Ubuntu iptables다. `10.20.1.0/24 -> TCP 5432` ACCEPT 규칙을 기본 REJECT 규칙보다 앞에 추가하고 영구 저장한다.
 
 ```bash
 sudo iptables -L INPUT --line-numbers -n

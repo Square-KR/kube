@@ -46,19 +46,5 @@ logrotate -d /etc/logrotate.conf > /dev/null 2>&1 || {
   exit 1
 }
 
-# 이전 정책의 일자 형식 아카이브를 새 형식으로 바꿔 rotate 14 개수 제한에 포함시킨다.
-# 타이머 재시작이 logrotate를 즉시 실행하므로 그 전에 끝내야 같은 파일을 동시에 압축하지 않는다.
-shopt -s nullglob
-for archive in /var/log/messages-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9] /var/log/messages-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].gz; do
-  base="${archive%.gz}"
-  target="${base}000000"
-  if [[ "$archive" == *.gz ]]; then
-    mv "$archive" "${target}.gz"
-  else
-    mv "$archive" "$target"
-    nice -n 19 ionice -c 3 gzip -1 "$target"
-  fi
-done
-
 systemctl daemon-reload
 systemctl restart logrotate.timer

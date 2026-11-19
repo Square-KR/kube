@@ -13,21 +13,6 @@ output "bastion_public_ip" {
   value       = oci_core_instance.bastion.public_ip
 }
 
-output "bastion_private_ip" {
-  description = "Bastion and PostgreSQL host private IP"
-  value       = oci_core_instance.bastion.private_ip
-}
-
-output "postgres_volume_id" {
-  description = "PostgreSQL data block volume OCID"
-  value       = oci_core_volume.postgres.id
-}
-
-output "load_balancer_subnet_id" {
-  description = "Subnet used by OCI Load Balancers"
-  value       = oci_core_subnet.public.id
-}
-
 output "envoy_lb_nsg_id" {
   description = "NSG attached to the Envoy OCI Load Balancer"
   value       = oci_core_network_security_group.envoy_lb.id
