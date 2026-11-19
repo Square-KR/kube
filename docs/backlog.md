@@ -8,6 +8,8 @@
 | 높음 | 노드 CPU·디스크 경보 | Datadog 모니터: 루트 파일시스템 70% 15분 경고·80% 5분 심각, `DiskPressure=True` 1분, ArgoCD repo-server Ready 0. Datadog UI에서 직접 구성한다 | [DiskPressure 기록](incidents/2026-09-10-disk-pressure.md) |
 | 중간 | PostgreSQL 볼륨 복원 시험 | 첫 정기 백업은 2026-11-19 03:00 KST에 생성됐다. [런북](runbooks/postgresql.md#백업과-복원)의 볼륨 복원 절차는 한 번도 수행하지 않았다 | [2026-11-19 기록](incidents/2026-11-19-gitops-drift-and-node-cpu.md) |
 | 중간 | DB 호스트 Datadog 태그 | 호스트 Agent의 `env:dev` 태그가 prod `honami` DB 지표에도 붙는다 | [2026-11-19 기록](incidents/2026-11-19-gitops-drift-and-node-cpu.md) |
+| 중간 | prod honami 단일 레플리카 | replicas 1이라 노드 drain 때 약 1분 503이 난다. replicas 2와 노드별 분산을 검토한다. 새 노드의 이미지 pull 시간도 영향을 준다 | [OKE 1.37 기록](incidents/2026-11-19-oke-1.37-upgrade.md) |
+| 중간 | cert-manager 1.22 | 1.21.3의 지원 Kubernetes는 1.33–1.36이다. 1.37을 지원 목록에 올린 1.22가 나오면 올린다 | [OKE 1.37 기록](incidents/2026-11-19-oke-1.37-upgrade.md) |
 | 중간 | OCI 보안 목록 잔여 규칙 | Cloud Controller가 예전에 추가한 NodePort 규칙(worker ingress 3건, public egress 3건)이 남아 있다. `terraform/main.tf`의 `ignore_changes`를 빼고 plan으로 삭제 범위를 확인한 뒤 정리한다 | [정리 기록](incidents/2026-11-19-repo-and-cluster-cleanup.md) |
 | 낮음 | SELinux 모드 불일치 | 워커의 `/etc/selinux/config`는 `enforcing`인데 런타임은 `Permissive`다. Enforcing 전환은 hostPath를 쓰는 모든 워크로드를 검증한 뒤에 한다 | [DiskPressure 기록](incidents/2026-09-10-disk-pressure.md) |
 | 낮음 | ArgoCD admin 계정 | `argocd-initial-admin-secret`이 남아 있고 admin 계정을 그대로 쓴다 | [2026-11-19 기록](incidents/2026-11-19-gitops-drift-and-node-cpu.md) |
