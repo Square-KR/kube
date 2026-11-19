@@ -43,7 +43,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE�
 | 이미지 배포 자동화 | `.github/workflows/deploy-image.yml` | `repository_dispatch`로 `projects/{service}/{env}/values.yaml`의 `image.version` 갱신 |
 | GHCR 정리 | `.github/workflows/cleanup-ghcr.yml`, `scripts/cleanup-ghcr.sh` | 배포 중 태그·`latest`·태그 없는 child manifest 보존 |
 | SSM 시크릿 업로드 | `scripts/env-to-ssm.sh` | `.env`를 `/{env}/{service}/{KEY}` SecureString으로 저장 |
-| 과거 장애·작업 | `docs/incidents/` | DiskPressure, OKE 업그레이드 기록 |
+| 과거 장애·작업 | `docs/incidents/` | DiskPressure, OKE 업그레이드, selfHeal 되돌림과 노드 CPU 포화 기록 |
 
 ## CURRENT INFRASTRUCTURE
 
