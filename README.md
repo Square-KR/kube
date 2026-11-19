@@ -110,7 +110,7 @@ kubectl get pods -A
 - `terraform destroy`는 PostgreSQL Block Volume도 제거한다. 필요한 데이터는 먼저 `pg_dump`로 백업한다.
 - OKE Kubernetes 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OCI에서 더 이상 지원하지 않으면 [OKE 업그레이드 런북](docs/runbooks/oke-upgrade.md)대로 올린다.
 - Bastion 공인 IP와 Envoy LoadBalancer IP는 재생성 시 바뀔 수 있다. PostgreSQL 내부 주소 `10.20.0.45`는 Terraform에 고정되어 있다.
-- PostgreSQL 데이터 볼륨은 Terraform의 백업 정책으로 매일 백업한다. 논리 백업, PITR, HA는 구성하지 않았고 볼륨 복원은 아직 시험하지 않았다.
+- PostgreSQL 데이터 볼륨은 Terraform의 백업 정책으로 매일 백업한다. 논리 백업, PITR, HA는 구성하지 않았다. 백업을 별도 볼륨으로 복원해 내용은 검증했지만 운영 볼륨을 교체하는 복원은 시험하지 않았다.
 - 워커 루트 파일시스템은 약 30 GiB라 `/var/log/messages`가 쌓이면 DiskPressure가 난다. `terraform/worker-init.sh`가 node pool user_data로 보존 정책을 설치하고, 실행 중인 노드에는 `sudo bash -s -- --logs-only < terraform/worker-init.sh`로 적용한다. 배경은 [DiskPressure 기록](docs/incidents/2026-09-10-disk-pressure.md)에 있다.
 
 ## 서비스 시크릿 등록

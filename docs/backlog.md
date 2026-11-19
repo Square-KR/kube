@@ -6,7 +6,7 @@
 |---|---|---|---|
 | 높음 | 시스템 파드 resource requests | `kube-system`을 제외한 시스템 컨테이너 대부분이 requests 없이 BestEffort로 실행된다. 스케줄러가 노드 여유를 판단하지 못해 한 노드에 몰릴 수 있다. 11-19 kubelet 무응답의 배경이다 | [정리 기록](incidents/2026-11-19-repo-and-cluster-cleanup.md) |
 | 높음 | 노드 CPU·디스크 경보 | Datadog 모니터: 루트 파일시스템 70% 15분 경고·80% 5분 심각, `DiskPressure=True` 1분, ArgoCD repo-server Ready 0. Datadog UI에서 직접 구성한다 | [DiskPressure 기록](incidents/2026-09-10-disk-pressure.md) |
-| 중간 | PostgreSQL 볼륨 복원 시험 | 첫 정기 백업은 2026-11-19 03:00 KST에 생성됐다. [런북](runbooks/postgresql.md#백업과-복원)의 볼륨 복원 절차는 한 번도 수행하지 않았다 | [2026-11-19 기록](incidents/2026-11-19-gitops-drift-and-node-cpu.md) |
+| 중간 | PostgreSQL 운영 볼륨 교체 절차 | 백업 내용은 별도 볼륨으로 검증했지만, [런북](runbooks/postgresql.md#백업과-복원)의 운영 볼륨 교체와 Terraform state 정렬 절차는 수행하지 않았다. 구체적인 명령으로 정리하고 다운타임을 잡아 시험한다 | [복원 시험 기록](incidents/2026-11-19-postgresql-restore-test.md) |
 | 중간 | DB 호스트 Datadog 태그 | 호스트 Agent의 `env:dev` 태그가 prod `honami` DB 지표에도 붙는다 | [2026-11-19 기록](incidents/2026-11-19-gitops-drift-and-node-cpu.md) |
 | 중간 | prod honami 단일 레플리카 | replicas 1이라 노드 drain 때 약 1분 503이 난다. replicas 2와 노드별 분산을 검토한다. 새 노드의 이미지 pull 시간도 영향을 준다 | [OKE 1.37 기록](incidents/2026-11-19-oke-1.37-upgrade.md) |
 | 중간 | cert-manager 1.22 | 1.21.3의 지원 Kubernetes는 1.33–1.36이다. 1.37을 지원 목록에 올린 1.22가 나오면 올린다 | [OKE 1.37 기록](incidents/2026-11-19-oke-1.37-upgrade.md) |

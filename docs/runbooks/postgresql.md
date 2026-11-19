@@ -1,6 +1,6 @@
 # PostgreSQL 운영 및 재구축
 
-마지막 검증: 2026-08-04 신규 설치와 재부팅, 2026-11-19 Datadog 호스트 Agent와 볼륨 백업 정책. 볼륨 백업 복원은 미검증.
+마지막 검증: 2026-08-04 신규 설치와 재부팅, 2026-11-19 Datadog 호스트 Agent, 볼륨 백업 정책, 별도 볼륨으로 백업 내용 검증. 운영 볼륨 교체 복원은 미검증.
 
 ## 목적과 범위
 
@@ -390,7 +390,76 @@ PGPASSWORD=$(security find-generic-password -a square_admin -s squarek8s-postgre
 
 Terraform의 `oci_core_volume_backup_policy.postgres`가 데이터 볼륨을 매일 03:00 KST에 증분 백업해 7일, 일요일 백업을 4주 보존한다. 볼륨 스냅샷이라 복원하면 PostgreSQL이 WAL로 crash recovery를 거쳐 올라온다. 논리 백업, 시점 복구(PITR), HA는 없다.
 
-볼륨 백업에서 복원할 때는 OCI 콘솔이나 CLI로 백업에서 새 볼륨을 만들고, PostgreSQL을 멈춘 뒤 기존 볼륨 대신 `/var/lib/postgresql`에 마운트한다. Terraform state의 `oci_core_volume.postgres`와 어긋나므로 복원 후 state를 새 볼륨에 맞춘다. 이 복원 절차는 아직 실제로 수행해 본 적이 없다.
+볼륨 백업에서 복원할 때는 OCI 콘솔이나 CLI로 백업에서 새 볼륨을 만들고, PostgreSQL을 멈춘 뒤 기존 볼륨 대신 `/var/lib/postgresql`에 마운트한다. Terraform state의 `oci_core_volume.postgres`와 어긋나므로 복원 후 state를 새 볼륨에 맞춘다. 운영 볼륨 교체 절차는 미검증이다.
+
+#### 백업 내용 검증
+
+운영 볼륨을 건드리지 않고 백업을 별도 볼륨으로 복원해 임시 인스턴스로 확인한다. 2026-11-19에 수행했다. OCI CLI는 Terraform과 같은 `--profile k8s-tf`로 실행한다. 기본 프로필은 `NotAuthorizedOrNotFound`를 반환한다.
+
+```bash
+cd terraform
+OCI=(--profile k8s-tf --region ap-seoul-1)
+COMP=$(terraform state show oci_core_volume.postgres | awk '$1 == "compartment_id" {gsub(/"/, "", $3); print $3}')
+VOL=$(terraform state show oci_core_volume.postgres | awk '$1 == "id" {gsub(/"/, "", $3); print $3}')
+INST=$(terraform state show oci_core_instance.bastion | awk '$1 == "id" {gsub(/"/, "", $3); print $3}')
+AD=$(terraform state show oci_core_volume.postgres | awk '$1 == "availability_domain" {gsub(/"/, "", $3); print $3}')
+
+oci bv backup list "${OCI[@]}" --compartment-id "$COMP" --volume-id "$VOL" --output table \
+  --query 'data[].{id:id,state:"lifecycle-state",created:"time-created",expires:"expiration-time"}'
+BACKUP=<복원할 백업 OCID>
+
+TEST_VOL=$(oci bv volume create "${OCI[@]}" --compartment-id "$COMP" --availability-domain "$AD" \
+  --volume-backup-id "$BACKUP" --display-name squarek8s-postgres-restore-test \
+  --wait-for-state AVAILABLE --query data.id --raw-output)
+ATTACH=$(oci compute volume-attachment attach "${OCI[@]}" --instance-id "$INST" --volume-id "$TEST_VOL" \
+  --type paravirtualized --wait-for-state ATTACHED --query data.id --raw-output)
+```
+
+DB 호스트에서 새 디스크를 확인하고 마운트한다. 복원 볼륨은 운영 볼륨과 ext4 UUID가 같으므로 UUID가 아니라 장치 경로로 마운트하고 `/etc/fstab`에 넣지 않는다. 장치 이름은 `lsblk`로 확인한다.
+
+```bash
+lsblk -o NAME,SIZE,MOUNTPOINT,UUID
+sudo mkdir -p /mnt/pgrestore
+sudo mount -o noatime /dev/sdc /mnt/pgrestore
+```
+
+스냅샷의 `postmaster.pid`는 운영 postmaster PID를 가리켜 임시 인스턴스가 시작을 거부한다. 복원 볼륨 쪽 파일만 지운다. Ubuntu 패키지는 설정을 `/etc/postgresql`에 두므로 임시 설정 파일을 따로 만들어 Unix 소켓 전용 포트 `5433`으로 띄운다.
+
+```bash
+D=/mnt/pgrestore/16/main
+sudo rm "$D/postmaster.pid"
+sudo install -d -o postgres -g postgres -m 700 /tmp/pgrestore-conf /tmp/pgrestore-sock
+sudo -u postgres tee /tmp/pgrestore-conf/postgresql.conf >/dev/null <<'EOF'
+port = 5433
+listen_addresses = ''
+unix_socket_directories = '/tmp/pgrestore-sock'
+hba_file = '/tmp/pgrestore-conf/pg_hba.conf'
+ident_file = '/tmp/pgrestore-conf/pg_ident.conf'
+shared_buffers = 128MB
+max_connections = 10
+EOF
+echo 'local all postgres peer' | sudo -u postgres tee /tmp/pgrestore-conf/pg_hba.conf >/dev/null
+sudo -u postgres touch /tmp/pgrestore-conf/pg_ident.conf
+sudo -u postgres /usr/lib/postgresql/16/bin/pg_ctl -D "$D" \
+  -o '-c config_file=/tmp/pgrestore-conf/postgresql.conf' -l /tmp/pgrestore-conf/server.log -w start
+```
+
+`server.log`에서 `automatic recovery in progress` 뒤 `ready to accept connections`를 확인한다. `invalid record length ... got 0`은 WAL 끝에 도달했다는 뜻이다. 이후 `psql -h /tmp/pgrestore-sock -p 5433`으로 DB별 테이블 목록과 행 수를 운영과 비교하고, `pg_dump -Fc`로 전체를 읽고, `amcheck`의 `bt_index_check(oid, true)`로 btree 인덱스를 검사한다. 운영보다 적은 행은 백업 시각 이후의 변경과 맞는지 타임스탬프로 확인한다.
+
+정리한다.
+
+```bash
+sudo -u postgres /usr/lib/postgresql/16/bin/pg_ctl -D /mnt/pgrestore/16/main -m fast -w stop
+sudo umount /mnt/pgrestore && sudo rmdir /mnt/pgrestore
+sudo rm -rf /tmp/pgrestore-conf /tmp/pgrestore-sock
+```
+
+```bash
+oci compute volume-attachment detach "${OCI[@]}" --volume-attachment-id "$ATTACH" --force --wait-for-state DETACHED
+oci bv volume delete "${OCI[@]}" --volume-id "$TEST_VOL" --force --wait-for-state TERMINATED
+```
+
+#### 논리 백업
 
 DB 하나만 되돌리거나 인프라를 제거하기 전에는 `pg_dump`로 수동 백업한다.
 
@@ -411,3 +480,4 @@ sudo -u postgres pg_restore --clean --if-exists --no-owner \
 
 - [README](../../README.md): 새 클러스터 구축 순서와 서비스 시크릿 등록
 - [2026-11-19 기록](../incidents/2026-11-19-gitops-drift-and-node-cpu.md): Datadog 호스트 Agent 이전과 볼륨 백업 정책 도입
+- [2026-11-19 복원 시험 기록](../incidents/2026-11-19-postgresql-restore-test.md): 정기 백업을 별도 볼륨으로 복원해 검증
