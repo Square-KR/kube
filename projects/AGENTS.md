@@ -2,109 +2,51 @@
 
 ## OVERVIEW
 
-`projects/`는 서비스 배포 정의 영역이다. 각 서비스는 `ApplicationSet`으로 관리하며, 공통 배포 로직은 `charts/app`을 재사용하고 서비스별 환경 값과 부가 매니페스트를 함께 묶는다.
+`projects/`는 서비스 배포 정의다. 서비스마다 `ApplicationSet` 하나가 환경별 Application을 만들고, 워크로드는 공통 chart `charts/app`으로 배포한다.
 
-## CURRENT STRUCTURE
+## SERVICES
 
-```text
-projects/
-├── _application.yaml
-└── notification-backend/
-    ├── applicationset.yaml
-    └── dev/
-        ├── external-secret.yaml
-        └── values.yaml
-```
+| 서비스 | 환경 | 네임스페이스 | 외부 주소 | 비고 |
+|---|---|---|---|---|
+| `notification-backend` | `dev` | `dev` | 없음 (클러스터 내부 `notification-backend.dev.svc.cluster.local`) | |
+| `honami` | `prod` | `prod` | `mllm.kr` | replicas 1 고정 |
+| `square-user-api` | `dev` | `dev` | `id-api-dev.sqr.kr` (`/api/`, `/.well-known/`) | 커밋 전. SSM·DB 준비 후 배포 |
 
-현재 서비스 정의는 `notification-backend/dev`다.
-
-## FILE RESPONSIBILITIES
+## FILES
 
 | 파일 | 역할 |
-|------|------|
-| `_application.yaml` | `projects/` 하위 `application.yaml`, `applicationset.yaml` 수집 |
+|---|---|
+| `_application.yaml` | `projects/` 아래 `application.yaml`, `applicationset.yaml` 수집 |
 | `{service}/applicationset.yaml` | 환경별 ArgoCD Application 생성 |
-| `{service}/{env}/values.yaml` | 공통 Helm chart 오버라이드 |
-| `{service}/{env}/external-secret.yaml` | SSM 경로를 서비스 secret으로 매핑 |
+| `{service}/{env}/values.yaml` | 공통 chart 오버라이드. 이미지 배포 워크플로가 `image.version`을 고친다 |
+| `{service}/{env}/external-secret.yaml` | SSM `/{env}/{service}/`를 서비스 Secret으로 매핑 |
+| `{service}/{env}/httproute.yaml` | 외부 노출이 필요할 때만 |
 
-## CURRENT SERVICE PATTERN
+## CONVENTIONS
 
-### `notification-backend`
+- ApplicationSet은 source 세 개를 묶는다: repo ref, `charts/app` Helm source(`valueFiles: $repo/projects/{service}/{env}/values.yaml`), 환경 디렉터리(`directory.exclude: values.yaml`). Kustomize는 쓰지 않는다.
+- `metadata.name`, Helm `releaseName`, 서비스 디렉터리 이름을 같게 둔다. namespace는 환경 이름과 같다.
+- ApplicationSet에는 Service의 `rollouts-pod-template-hash` 셀렉터와 Rollout의 `reloader.stakater.com/last-reloaded-from` 어노테이션에 대한 `ignoreDifferences`, `RespectIgnoreDifferences=true`를 둔다. 빠지면 blue-green 전환과 시크릿 변경 후 자동 재시작이 selfHeal로 되돌려진다.
+- `managedNamespaceMetadata`에는 `square-kr.io/ghcr-pull-secret: "true"`와 Pod Security `enforce`·`audit`·`warn: restricted`를 둔다. `*-version` 라벨은 두지 않는다.
+- ExternalSecret은 `dataFrom.find.name.regexp: "^/{env}/{service}/"`로 찾고 `rewrite`로 prefix를 지워 키 이름만 남긴다. SSM 값을 바꾸면 최대 1시간 안에 Secret이 갱신되고 Reloader가 재배포한다.
+- HTTPRoute는 `infra/http` Gateway의 listener에 붙이고 `backendRefs`에 `group: ""`, `kind: Service`, `weight: 1`을 명시한다. `weight`를 뺐을 때 ArgoCD drift가 생겨 `fdce5bf`에서 추가했다.
+- 이미지는 `linux/arm64` manifest를 포함해야 한다. 서비스 저장소가 `deploy-image` `repository_dispatch`(`service`, `environment`, `version`)를 보내면 워크플로가 `image.version`을 커밋한다.
+- GHCR 인증은 공용 `ghcr-pull-secret`을 `imagePullSecrets`로 참조한다.
 
-- Helm release name: `notification-backend`
-- 배포 namespace: generator의 `env` 값 사용, 현재는 `dev`
-- chart source: `charts/app`
-- manifest source: `projects/notification-backend/{env}`
-- 현재 image: `ghcr.io/square-kr/notification-backend`
-- 현재 health check:
-  - liveness: `/healthz`
-  - readiness: `/readyz`
+## 새 서비스 추가 체크리스트
 
-## HOW A SERVICE IS WIRED
+1. SSM `/{env}/{service}/`에 시크릿을 넣는다. DB가 필요하면 [PostgreSQL 런북](../docs/runbooks/postgresql.md#서비스-db-추가)의 서비스 DB 추가 절차를 먼저 한다.
+2. 기존 서비스의 `applicationset.yaml`을 복사해 이름, `releaseName`, 경로, component 라벨, generator 환경을 바꾼다.
+3. `{env}/values.yaml`, `{env}/external-secret.yaml`, 필요하면 `{env}/httproute.yaml`을 만든다. 새 도메인이면 Gateway listener와 Cloudflare 레코드도 확인한다.
+4. `scripts/validate-manifests.sh`를 실행한다.
+5. 위 SERVICES 표를 고친다.
 
-`applicationset.yaml`은 보통 세 개의 source를 묶는다.
-
-1. repo ref source
-2. `charts/app` Helm source
-3. 서비스 환경 디렉터리 source
-
-현재 `notification-backend`는 generator에 `dev`만 선언되어 있으므로, prod를 추가하려면 ApplicationSet generator와 `prod/` 디렉터리를 같이 추가해야 한다.
-
-## SECRETS CONVENTION
-
-- 서비스 시크릿은 `/{env}/{service}/...` SSM 경로를 사용한다.
-- `external-secret.yaml`은 `find.name.regexp`로 서비스 prefix를 찾는다.
-- `rewrite.regexp`로 prefix를 제거해 Kubernetes secret key로 변환한다.
-- 이미지 pull secret은 서비스 디렉터리에서 만들지 않고 공용 `ghcr-pull-secret`을 참조한다.
-
-예시:
-
-```text
-/dev/notification-backend/FOO
--> ExternalSecret rewrite
--> secret key: FOO
-```
-
-## WHEN ADDING OR UPDATING A SERVICE
-
-### 새 서비스 추가
-
-필수 파일:
-- `projects/{service}/applicationset.yaml`
-- `projects/{service}/{env}/values.yaml`
-- `projects/{service}/{env}/external-secret.yaml`
-
-필요 시 추가:
-- `httproute.yaml`
-- ConfigMap, Secret, NetworkPolicy 등 서비스별 보조 리소스
-
-체크 포인트:
-- `metadata.name`, Helm `releaseName`, 디렉터리명이 일치하는가
-- `destination.namespace`가 env와 맞는가
-- `valueFiles` 경로가 실제 파일과 맞는가
-- SSM 경로 prefix와 rewrite regexp가 서비스명과 맞는가
-
-### 기존 서비스 수정
-
-- 이미지 태그 변경: `{env}/values.yaml`의 `image.version`. 보통 서비스 저장소가 `deploy-image` `repository_dispatch`(`service`, `environment`, `version`)를 보내 `.github/workflows/deploy-image.yml`이 커밋한다. 이미지는 `linux/arm64`를 포함해야 한다.
-- 포트/프로브 변경: `{env}/values.yaml`
-- 환경변수 추가: `{env}/values.yaml`의 `env`
-- secret 매핑 추가: `{env}/external-secret.yaml`
-- 외부 노출 추가: 서비스 env 디렉터리에 `httproute.yaml` 추가 후 Gateway에 attach
-
-## CURRENT CONVENTIONS
-
-- namespace는 환경명과 동일하게 쓴다.
-- 서비스 워크로드는 직접 작성하지 않고 `charts/app`을 통해 Rollout으로 배포한다.
-- 공통 GHCR 인증은 `system/external-secrets/ghcr-pull-secret.yaml`에서 관리한다.
-- 환경 디렉터리 source는 `directory.exclude: values.yaml`로 Helm values를 제외한 나머지 매니페스트를 그대로 적용한다. Kustomize는 사용하지 않는다.
-- ApplicationSet에는 Service의 `rollouts-pod-template-hash` 셀렉터와 Rollout의 `reloader.stakater.com/last-reloaded-from` 어노테이션에 대한 `ignoreDifferences`, 그리고 `RespectIgnoreDifferences=true`를 둔다. 새 서비스의 ApplicationSet에도 그대로 넣는다.
-- SSM 값을 바꾸면 ExternalSecret 갱신(최대 1시간) 뒤 Reloader가 자동으로 재배포한다. 수동 재시작은 필요 없다.
-- ApplicationSet `managedNamespaceMetadata`의 Pod Security `*-version` 라벨은 클러스터 Kubernetes minor 버전과 맞춘다. 현재 `v1.36`이다.
+환경을 추가할 때는 generator에 환경을 넣고 같은 이름의 디렉터리를 함께 만든다.
 
 ## DO NOT
 
-- 서비스별 `pull-secret.yaml`을 다시 만들지 말 것
-- 서비스마다 배포 템플릿을 복사해 중복 관리하지 말 것
-- `values.yaml`에 시크릿 값을 직접 넣지 말 것
-- generator에 없는 env 디렉터리를 추가만 하고 ApplicationSet을 안 바꾸는 상태로 두지 말 것
+- 서비스별 pull secret을 만들지 않는다.
+- 서비스마다 배포 템플릿을 복사하지 않는다.
+- `values.yaml`에 시크릿 값을 넣지 않는다.
+- generator에 없는 환경 디렉터리만 추가하지 않는다.
+- `kustomization.yaml`을 추가하지 않는다.

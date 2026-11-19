@@ -2,118 +2,37 @@
 
 ## OVERVIEW
 
-`charts/app`은 서비스 워크로드 공통 Helm chart다. 현재 chart는 Argo Rollout 기반 blue-green 배포, ClusterIP Service, 선택적 HPA/PDB만 제공하며, 개별 서비스 차이는 환경별 `values.yaml`에서 주입한다.
+`charts/app`은 서비스 워크로드 공통 Helm chart다. Argo Rollout blue-green 배포와 ClusterIP Service만 만든다. 서비스별 차이는 `projects/{service}/{env}/values.yaml`에서 주입하며 기본값은 `values.yaml`에 있다.
 
 ## FILES
 
 | 파일 | 역할 |
-|------|------|
-| `Chart.yaml` | chart 메타데이터 |
-| `values.yaml` | 기본값 정의 |
-| `templates/_helpers.tpl` | 이름/라벨 helper |
+|---|---|
+| `values.yaml` | 기본값 |
+| `templates/_helpers.tpl` | 이름·라벨 helper |
 | `templates/rollout.yaml` | 애플리케이션 Rollout |
-| `templates/service.yaml` | 활성 Service |
-| `templates/hpa.yaml` | 선택적 CPU 기반 HPA |
-| `templates/pdb.yaml` | 선택적 PDB |
+| `templates/service.yaml` | blue-green 활성 Service |
 
-## DEFAULT VALUES
+## BEHAVIOR
 
-```yaml
-nameOverride: ""
-fullnameOverride: ""
+코드만 봐서는 드러나지 않는 동작이다.
 
-replicas: 1
-
-port: 3000
-
-healthCheck:
-  port: ""
-  liveness: /healthz/liveness
-  readiness: /healthz/readiness
-  timeoutSeconds: 1
-
-image:
-  name: ""
-  version: latest
-
-resources:
-  cpu: "100m"
-  memory: "128Mi"
-
-env: []
-secrets: []
-imagePullSecrets: []
-
-hpa:
-  enabled: false
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 50
-
-pdb:
-  enabled: false
-  minAvailable: "50%"
-```
-
-## TEMPLATE BEHAVIOR
-
-### `rollout.yaml`
-
-- 리소스 타입은 `argoproj.io/v1alpha1` `Rollout`
-- `hpa.enabled: false`일 때만 `spec.replicas`를 렌더링한다.
-- 컨테이너 이름은 항상 `app`
-- 이미지 경로는 `"{{ .Values.image.name }}:{{ .Values.image.version }}"`
-- 기본 env:
-  - `LISTEN_PORT`
-  - `HOST_IP` (`status.hostIP` fieldRef)
-  - `OTEL_EXPORTER_OTLP_ENDPOINT=http://$(HOST_IP):4317`
-- `env` 배열은 그대로 추가한다.
-- `secrets` 배열이 있으면 `envFrom.secretRef`로 주입한다.
-- `reloader.stakater.com/auto: "true"` annotation이 항상 들어간다. 참조하는 Secret이 바뀌면 Reloader가 Pod template에 `reloader.stakater.com/last-reloaded-from` 어노테이션을 써서 blue-green 재배포를 일으킨다.
-- `revisionHistoryLimit: 2`
-- `topologySpreadConstraints`를 기본으로 걸어 노드 분산을 시도한다.
-- 전략은 `blueGreen.activeService=<fullname>`
-- Pod는 `restricted` Pod Security를 통과하도록 non-root, `RuntimeDefault` seccomp, 읽기 전용 루트 파일시스템, 모든 capability drop으로 실행한다. 쓰기가 필요하면 메모리 기반 `/tmp`(64Mi)를 사용한다.
+- Rollout과 Service 이름은 Helm release name이다. ApplicationSet의 `releaseName`을 서비스 디렉터리 이름과 같게 둔다.
+- 컨테이너 이름은 항상 `app`, Service 포트는 항상 `80`이고 `targetPort`는 `port`다.
+- `LISTEN_PORT`, `HOST_IP`, `OTEL_EXPORTER_OTLP_ENDPOINT=http://$(HOST_IP):4317`을 항상 넣는다. OTLP는 같은 노드의 Datadog Agent로 간다.
+- `reloader.stakater.com/auto: "true"`가 항상 붙는다. `secrets`로 참조한 Secret이 바뀌면 Reloader가 Pod template에 `reloader.stakater.com/last-reloaded-from`을 써서 blue-green 재배포가 일어난다.
+- `restricted` Pod Security를 통과하도록 non-root, `RuntimeDefault` seccomp, 읽기 전용 루트 파일시스템, 모든 capability drop으로 실행한다. 쓰기가 필요하면 메모리 기반 `/tmp`(64Mi)를 쓴다.
 - ServiceAccount 토큰은 마운트하지 않는다.
+- `resources.cpu`는 requests에만, `resources.memory`는 requests와 limits에 같이 들어간다. CPU limit은 두지 않는다.
+- namespace는 chart에서 지정하지 않고 ArgoCD destination을 따른다.
 
-### `service.yaml`
+## WHEN TO EDIT
 
-- `ClusterIP` Service를 생성한다.
-- 서비스 포트는 항상 `80`
-- `targetPort`는 `.Values.port`
-
-### `hpa.yaml`
-
-- `hpa.enabled: true`일 때만 생성한다.
-- 대상은 `Rollout` 리소스다.
-- 현재 메트릭은 CPU utilization 하나만 사용한다.
-
-### `pdb.yaml`
-
-- `pdb.enabled: true`일 때만 생성한다.
-- `minAvailable`만 사용한다.
-
-## CURRENT CONVENTIONS
-
-- 서비스명은 보통 Helm release name과 동일하게 둔다.
-- namespace는 chart 내부에서 지정하지 않고 ArgoCD destination namespace를 따른다.
-- GHCR 인증은 서비스별 시크릿을 만들지 않고 공용 `ghcr-pull-secret`을 `imagePullSecrets`로 참조한다.
-- 리소스 요청/제한은 현재 구조상 `cpu=requests`, `memory=limits`만 기본 템플릿에서 직접 다룬다.
-- readiness/liveness 경로가 기본값과 다르면 서비스별 `values.yaml`에서 반드시 덮어쓴다.
-
-## WHEN TO EDIT THIS CHART
-
-- 모든 서비스에 공통으로 적용돼야 하는 배포 동작을 바꿀 때
-- 공통 값 스키마를 추가할 때
-- 새로운 공통 Kubernetes 리소스를 템플릿으로 제공할 때
-
-먼저 확인할 것:
-- 서비스별 차이만으로 해결 가능한가
-- 기존 `values.yaml` 오버라이드로 충분한가
-- chart 변경이 현재 모든 서비스와 환경에 동시에 영향을 줘도 되는가
+모든 서비스에 공통으로 적용해야 하는 배포 동작이나 값 스키마를 바꿀 때만 고친다. 먼저 서비스 `values.yaml` 오버라이드로 해결되는지 확인하고, 변경이 모든 서비스와 환경에 동시에 적용되어도 되는지 확인한다. 고친 뒤에는 `scripts/validate-manifests.sh`로 모든 서비스의 렌더링을 확인한다.
 
 ## DO NOT
 
-- 특정 서비스 요구사항 때문에 공통 템플릿을 바로 분기하지 말 것
-- chart 안에 환경별 값이나 서비스명을 하드코딩하지 말 것
-- `Deployment` 템플릿을 추가해 Rollout 경로를 우회하지 말 것
+- 특정 서비스 요구 때문에 공통 템플릿에 분기를 넣지 않는다.
+- chart 안에 환경별 값이나 서비스명을 하드코딩하지 않는다.
+- `Deployment` 템플릿을 추가해 Rollout을 우회하지 않는다.
+- selector 라벨(`app.selectorLabels`)을 바꾸지 않는다. 기존 ReplicaSet, Service 셀렉터와 어긋나 모든 서비스를 다시 배포해야 한다.

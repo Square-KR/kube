@@ -1,18 +1,25 @@
 # Square-KR Kubernetes
 
-OCI OKE와 ArgoCD App-of-Apps로 운영하는 Kubernetes GitOps 저장소다.
+OCI OKE와 ArgoCD App-of-Apps로 운영하는 Kubernetes GitOps 저장소다. 저장소 규칙은 [AGENTS.md](AGENTS.md), 문서 목록과 템플릿은 [문서 안내](docs/README.md)에 있다.
 
 ## 현재 구성
 
+버전·사양·주소의 기준 문서다. 바뀌면 이 표를 먼저 고친다.
+
 | 구성 | 사양 |
 |---|---|
-| OKE | Basic Cluster, Kubernetes `v1.36.4`, Flannel CNI |
-| 워커 | `VM.Standard.A1.Flex` 2대, 각 1 OCPU / 8 GiB / 50 GB |
-| Bastion + PostgreSQL | `VM.Standard.A1.Flex` 1대, 2 OCPU / 8 GiB / 부트 50 GB, `10.20.0.45` |
-| PostgreSQL 데이터 | OCI Block Volume 50 GB |
-| 인그레스 | Envoy Gateway + OCI Flexible Load Balancer, Cloudflare IP만 허용하는 NSG |
+| 리전 | OCI `ap-seoul-1`, AWS SSM은 `ap-northeast-2` |
+| OKE | Basic Cluster, Kubernetes `v1.36.4`, Flannel Overlay |
+| 워커 | `VM.Standard.A1.Flex` 2대, 각 1 OCPU / 8 GiB / 50 GB (루트 파일시스템 약 30 GiB) |
+| 네트워크 | VCN `10.20.0.0/16`, public subnet `10.20.0.0/24`, worker subnet `10.20.1.0/24`, Pod `10.244.0.0/16`, Service `10.96.0.0/16` |
+| Bastion + PostgreSQL | `VM.Standard.A1.Flex` 1대, 2 OCPU / 8 GiB / 부트 50 GB, `10.20.0.45`, PostgreSQL 16 |
+| PostgreSQL 데이터 | OCI Block Volume 50 GB, 매일 03:00 KST 증분 백업 7일·일요일 백업 4주 보존 |
+| 인그레스 | Envoy Gateway, 프록시 2개(노드별 1개) + OCI Flexible Load Balancer 10 Mbps, Cloudflare IPv4만 허용하는 NSG |
+| 도메인 | Cloudflare proxied `sqr.kr`, `*.sqr.kr`, `mllm.kr` |
+| 모니터링 | Datadog `us5.datadoghq.com`. 클러스터 Agent(APM, 컨테이너 로그, OTEL)와 DB 호스트 Agent(호스트 지표, PostgreSQL DBM) |
 | 원격 DB 관리 | Tailscale subnet router `10.20.0.0/16` |
 | Terraform state | OCI Object Storage 원격 backend |
+| 서비스 | `notification-backend`(dev), `honami`(prod). 목록은 [projects/AGENTS.md](projects/AGENTS.md) |
 
 ## 새 클러스터 구축
 
@@ -21,7 +28,7 @@ OCI OKE와 ArgoCD App-of-Apps로 운영하는 Kubernetes GitOps 저장소다.
 ### 1. 사전 준비
 
 - OCI CLI `k8s-tf` 프로필
-- Terraform, OCI CLI, `kubectl`, `helmfile`
+- Terraform, OCI CLI, `kubectl`, `helmfile`, `helm-diff` 플러그인
 - 암호 없는 전용 SSH 키 `~/.ssh/squarek8s`, `~/.ssh/squarek8s.pub`
 - OCI Object Storage의 Terraform state 버킷
 - AWS SSM 접근 권한이 있는 액세스 키
@@ -71,7 +78,7 @@ kubectl get nodes
 
 ### 4. PostgreSQL 준비
 
-[PostgreSQL 운영 문서](docs/postgresql.md)의 신규 설치, 튜닝, 역할, Tailscale 절차를 수행하고, 기존 데이터가 있으면 애플리케이션을 배포하기 전에 복원한다. DB 역할·스키마·SSM 값은 Terraform이나 ArgoCD가 만들지 않는다.
+[PostgreSQL 런북](docs/runbooks/postgresql.md)의 설치, 튜닝, 역할, 서비스 DB, Tailscale 절차를 수행하고, 기존 데이터가 있으면 애플리케이션을 배포하기 전에 복원한다. DB 역할·스키마·SSM 값은 Terraform이나 ArgoCD가 만들지 않는다.
 
 ### 5. GitOps 부트스트랩
 
@@ -86,7 +93,7 @@ export AWS_SECRET_ACCESS_KEY=...
 
 ### 6. DNS와 최종 확인
 
-Envoy LoadBalancer의 공인 IP를 확인한 뒤 Cloudflare의 `sqr.kr`, `*.sqr.kr` proxied A 레코드를 변경한다.
+Envoy LoadBalancer의 공인 IP를 확인한 뒤 Cloudflare의 `sqr.kr`, `*.sqr.kr`, `mllm.kr` proxied A 레코드를 변경한다.
 
 ```bash
 kubectl get gateway -n infra
@@ -101,11 +108,10 @@ kubectl get pods -A
 
 - Object Storage의 Terraform state는 인프라 목록이지 PostgreSQL 데이터 백업이 아니다.
 - `terraform destroy`는 PostgreSQL Block Volume도 제거한다. 필요한 데이터는 먼저 `pg_dump`로 백업한다.
-- OKE Kubernetes 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OCI에서 더 이상 지원하지 않으면 현재 지원 버전과 이미지로 갱신한 뒤 plan을 확인한다. 제어 플레인은 minor 버전 단위로 올린다. 진행 예시는 [OKE 업그레이드 기록](docs/incidents/2026-10-09-oke-upgrade.md)에 있다.
-- 업그레이드 후 `projects/*/applicationset.yaml`의 Pod Security `*-version` 라벨도 클러스터 버전에 맞춘다.
+- OKE Kubernetes 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OCI에서 더 이상 지원하지 않으면 [OKE 업그레이드 런북](docs/runbooks/oke-upgrade.md)대로 올린다.
 - Bastion 공인 IP와 Envoy LoadBalancer IP는 재생성 시 바뀔 수 있다. PostgreSQL 내부 주소 `10.20.0.45`는 Terraform에 고정되어 있다.
-- PostgreSQL 데이터 볼륨은 Terraform의 백업 정책으로 매일 백업한다(7일, 주간 4주 보존). 논리 백업과 HA는 구성하지 않았다.
-- 워커 루트 파일시스템은 약 30 GiB라 `/var/log/messages`가 쌓이면 DiskPressure가 난다. `terraform/worker-init.sh`가 node pool user_data로 보존 정책을 설치한다. 배경은 [DiskPressure 기록](docs/incidents/2026-09-10-disk-pressure.md)에 있다.
+- PostgreSQL 데이터 볼륨은 Terraform의 백업 정책으로 매일 백업한다. 논리 백업, PITR, HA는 구성하지 않았고 볼륨 복원은 아직 시험하지 않았다.
+- 워커 루트 파일시스템은 약 30 GiB라 `/var/log/messages`가 쌓이면 DiskPressure가 난다. `terraform/worker-init.sh`가 node pool user_data로 보존 정책을 설치하고, 실행 중인 노드에는 `sudo bash -s -- --logs-only < terraform/worker-init.sh`로 적용한다. 배경은 [DiskPressure 기록](docs/incidents/2026-09-10-disk-pressure.md)에 있다.
 
 ## 서비스 시크릿 등록
 
@@ -120,5 +126,7 @@ PREFIX=/dev/notification-backend ENV_FILE=.env scripts/env-to-ssm.sh
 ```bash
 ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_public_ip)
 kubectl port-forward svc/argocd-server -n argocd 8080:443
+security find-generic-password -a square_admin -s squarek8s-postgresql -w | pbcopy   # PostgreSQL 관리자 비밀번호를 클립보드로
+nc -vz 10.20.0.45 5432                                                              # Tailscale 경유 DB 연결
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
 ```

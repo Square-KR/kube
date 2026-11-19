@@ -2,71 +2,48 @@
 
 ## OVERVIEW
 
-Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE와 네트워크, Bastion 겸 PostgreSQL 인스턴스를 만들고 ArgoCD App-of-Apps로 클러스터 리소스를 배포한다. 인그레스는 Envoy Gateway, 애플리케이션 배포는 Argo Rollouts, 시크릿 동기화는 External Secrets + AWS SSM Parameter Store를 사용한다.
+Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE, 네트워크, Bastion 겸 PostgreSQL 인스턴스를 만들고 ArgoCD App-of-Apps로 클러스터 리소스를 배포한다. 인그레스는 Envoy Gateway, 애플리케이션 배포는 Argo Rollouts, 시크릿 동기화는 External Secrets + AWS SSM Parameter Store를 쓴다. 현재 버전·사양·주소는 [README](README.md)의 "현재 구성"을 본다.
 
-## CURRENT STRUCTURE
+## STRUCTURE
 
 ```text
 .
-├── .github/workflows/  # 이미지 태그 갱신(deploy-image), GHCR 정리(cleanup-ghcr)
-├── terraform/          # OCI VCN, OKE, 워커(worker-init.sh user_data), Bastion/DB, Block Volume
-├── bootstrap/          # ArgoCD Helmfile
-├── system/             # Gateway API CRD, cert-manager, Envoy Gateway, External Secrets 등
-├── networking/         # 공통 Gateway, HTTPS, HTTP redirect, ArgoCD HTTPRoute
-├── observability/      # Datadog operator, Agent
+├── .github/workflows/  # validate(매니페스트·스크립트 검증), deploy-image(이미지 태그 갱신), cleanup-ghcr(GHCR 정리)
+├── terraform/          # OCI VCN, OKE, 워커(worker-init.sh user_data), Bastion/DB, Block Volume과 백업 정책
+├── bootstrap/          # ArgoCD Helmfile. GitOps 밖에서 수동 적용
+├── system/             # Gateway API CRD, cert-manager, Envoy Gateway, External Secrets, Argo Rollouts, Reloader
+├── networking/         # 공통 Gateway, EnvoyProxy·OCI LB 설정, HTTP redirect, ArgoCD HTTPRoute
+├── observability/      # Datadog operator, DatadogAgent
 ├── projects/           # 서비스 배포 정의
-├── charts/app/         # 공통 Argo Rollout 애플리케이션 Helm chart
-├── scripts/            # GHCR 정리와 테스트, .env → SSM 업로드
-├── docs/
-│   ├── postgresql.md   # PostgreSQL 설치, 튜닝, 역할, Tailscale, 복구
-│   └── incidents/      # 날짜별 장애·작업 기록
+├── charts/app/         # 공통 Argo Rollout chart
+├── scripts/            # 매니페스트 검증, GHCR 정리와 테스트, .env → SSM 업로드
+├── docs/               # 문서 안내와 템플릿, 런북, 기록, backlog
 ├── root.yaml           # 최상위 ArgoCD root Application
 └── bootstrap.sh        # ArgoCD 설치, AWS 자격 증명 Secret, root 적용
 ```
 
-`platform/`과 Valkey는 제거된 상태다.
-
 ## WHERE TO LOOK
 
-| 작업 | 위치 | 메모 |
+| 작업 | 위치 | 참고 |
 |---|---|---|
-| OCI 인프라 수정 | `terraform/` | 원격 OCI Object Storage state 사용 |
+| OCI 인프라 | `terraform/` | 원격 OCI Object Storage state |
 | 워커 노드 OS 설정 | `terraform/worker-init.sh` | OKE 기본 초기화 후 messages logrotate 정책 설치 |
-| 클러스터 부트스트랩 | `bootstrap/`, `bootstrap.sh` | ArgoCD 설치 후 AWS SSM 자격 증명과 root 적용 |
-| 루트 App-of-Apps 수정 | `root.yaml` | `**/_application.yaml`만 수집 |
-| 시스템 컴포넌트 수정 | `system/` | Gateway API CRD, cert-manager, Envoy Gateway, External Secrets, Rollouts, Reloader |
-| 공통 게이트웨이 수정 | `networking/gateway/` | `infra` 네임스페이스의 Gateway/HTTPRoute와 OCI LB 설정 |
-| 모니터링 수정 | `observability/datadog/` | Datadog operator, DatadogAgent. PostgreSQL DBM은 DB 호스트 Agent가 수집 |
-| 서비스 배포 수정 | `projects/` | `notification-backend/dev` |
-| 공통 앱 템플릿 수정 | `charts/app/` | Rollout, Service, HPA, PDB |
-| PostgreSQL 운영 | `docs/postgresql.md` | Terraform 이후 수동 설치·역할·Tailscale·복구 절차 |
-| 이미지 배포 자동화 | `.github/workflows/deploy-image.yml` | `repository_dispatch`로 `projects/{service}/{env}/values.yaml`의 `image.version` 갱신 |
-| GHCR 정리 | `.github/workflows/cleanup-ghcr.yml`, `scripts/cleanup-ghcr.sh` | 배포 중 태그·`latest`·태그 없는 child manifest 보존 |
+| OKE 업그레이드 | `terraform/main.tf` | [OKE 업그레이드 런북](docs/runbooks/oke-upgrade.md) |
+| 클러스터 부트스트랩 | `bootstrap/`, `bootstrap.sh` | README "새 클러스터 구축" |
+| 시스템 컴포넌트 | `system/` | |
+| Gateway, Envoy 프록시, LB | `networking/gateway/` | `infra` Gateway, `envoy-gateway-system` EnvoyProxy |
+| 모니터링 | `observability/datadog/` | PostgreSQL 지표는 DB 호스트 Agent가 수집 |
+| 서비스 배포 | `projects/` | [projects/AGENTS.md](projects/AGENTS.md) |
+| 공통 앱 템플릿 | `charts/app/` | [charts/app/AGENTS.md](charts/app/AGENTS.md) |
+| PostgreSQL, Tailscale, DB 호스트 Datadog Agent | 호스트 수동 구성 | [PostgreSQL 런북](docs/runbooks/postgresql.md) |
+| 이미지 배포 자동화 | `.github/workflows/deploy-image.yml` | `projects/{service}/{env}/values.yaml`의 `image.version` 갱신 |
+| GHCR 정리 | `.github/workflows/cleanup-ghcr.yml`, `scripts/cleanup-ghcr.sh` | 배포 중 태그, `latest`, 태그 없는 child manifest 보존 |
 | SSM 시크릿 업로드 | `scripts/env-to-ssm.sh` | `.env`를 `/{env}/{service}/{KEY}` SecureString으로 저장 |
-| 과거 장애·작업 | `docs/incidents/` | DiskPressure, OKE 업그레이드, selfHeal 되돌림과 노드 CPU 포화 기록 |
-
-## CURRENT INFRASTRUCTURE
-
-| 항목 | 현재 값 |
-|---|---|
-| OCI 리전 | `ap-seoul-1` |
-| OKE | Basic Cluster, Kubernetes `v1.36.4`, Flannel Overlay |
-| 워커 | `VM.Standard.A1.Flex` 2대, 각 1 OCPU / 8 GiB / 50 GB |
-| VCN | `10.20.0.0/16` |
-| Public subnet | `10.20.0.0/24` |
-| Worker subnet | `10.20.1.0/24` |
-| Pod / Service CIDR | `10.244.0.0/16` / `10.96.0.0/16` |
-| Bastion + PostgreSQL | `10.20.0.45`, 2 OCPU / 8 GiB / 부트 50 GB |
-| PostgreSQL 데이터 | OCI Block Volume 50 GB, `/var/lib/postgresql` |
-| PostgreSQL 백업 | Block Volume 백업 정책 `squarek8s-postgres-backup`: 매일 03:00 KST 증분 7일, 일요일 백업 4주 보존 |
-| 인그레스 | Envoy Gateway + OCI Flexible Load Balancer 10 Mbps + Cloudflare 전용 NSG |
-| Terraform state | OCI Object Storage remote backend |
-
-OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OCI에서 지원이 끝나면 지원 버전과 정확한 OKE 이미지 이름을 함께 갱신한다.
+| 남은 일, 과거 장애·작업 | `docs/backlog.md`, `docs/incidents/` | [문서 안내](docs/README.md) |
 
 ## DEPLOYMENT FLOW
 
-`root`가 도메인별 App-of-Apps를 아래 wave 순서로 만든다.
+`root`가 도메인별 App-of-Apps를 wave 순서로 만든다.
 
 | Wave | 구성 | 목적 |
 |---|---|---|
@@ -75,156 +52,110 @@ OKE 버전과 노드 이미지는 `terraform/main.tf`에 고정되어 있다. OC
 | 4 | `observability` | Datadog |
 | 5 | `projects` | 서비스 워크로드 |
 
-`system` 내부에서는 Gateway API CRD, cert-manager, Argo Rollouts, Reloader가 wave 0, Envoy Gateway와 External Secrets가 wave 1이다.
+`system` 안에서는 Gateway API CRD, cert-manager, Argo Rollouts, Reloader가 wave 0, Envoy Gateway와 External Secrets가 wave 1이다.
 
 ## REPO CONVENTIONS
 
 ### ArgoCD 파일 패턴
 
-- `root.yaml`: 저장소 최상위 root Application
-- `_application.yaml`: 도메인별 App-of-Apps 엔트리
-- `application.yaml`: 단일 컴포넌트용 Application
-- `applicationset.yaml`: 환경별 또는 반복 배포용 ApplicationSet
+- `root.yaml`: 최상위 root Application. `**/_application.yaml`만 수집한다.
+- `_application.yaml`: 도메인별 App-of-Apps. 하위 `application.yaml`, `applicationset.yaml`을 수집한다.
+- `application.yaml`: 단일 컴포넌트 Application
+- `applicationset.yaml`: 환경별 또는 반복 배포 ApplicationSet
 
-`root.yaml`는 `**/_application.yaml`만 수집한다. 각 도메인의 `_application.yaml`는 하위 `application.yaml`, `applicationset.yaml`를 수집한다.
+### 네임스페이스
 
-### Namespace 규칙
+| 네임스페이스 | 용도 |
+|---|---|
+| `argocd` | ArgoCD control plane |
+| `cert-manager` | cert-manager, ClusterIssuer가 쓰는 `cloudflare-api-token`과 ACME 계정 키 |
+| `external-secrets` | External Secrets와 `aws-ssm-credentials` |
+| `argo-rollouts`, `reloader` | 각 컨트롤러 |
+| `envoy-gateway-system` | Envoy Gateway controller와 프록시 |
+| `infra` | 공통 Gateway와 HTTPRoute |
+| `datadog` | Datadog operator와 Agent |
+| `dev`, `prod` | 서비스 워크로드 |
 
-- `argocd`: ArgoCD control plane
-- `cert-manager`: cert-manager. ClusterIssuer가 쓰는 `cloudflare-api-token`과 ACME 계정 키도 여기에 둔다.
-- `external-secrets`: External Secrets와 `aws-ssm-credentials`
-- `argo-rollouts`: Argo Rollouts
-- `reloader`: Reloader
-- `envoy-gateway-system`: Envoy Gateway controller와 proxy 설정
-- `infra`: 공통 Gateway와 HTTPRoute
-- `datadog`: Datadog operator와 agent
-- `dev`: 개발 애플리케이션 워크로드
-- `prod`: 운영 애플리케이션 워크로드
+### 시크릿
 
-### Secret 규칙
+- External Secrets backend는 AWS SSM Parameter Store이고, 단일 `ClusterSecretStore` `aws-ssm`의 자격 증명은 `external-secrets/aws-ssm-credentials`에 있다.
+- 서비스 시크릿은 `/{env}/{service}/{KEY}`, 인프라 시크릿은 `/infrastructure/{ghcr,cloudflare,datadog}/...`를 쓴다. `/infrastructure/datadog/postgresql-password`는 DB 호스트 Agent 설정에만 쓴다.
+- GHCR pull secret은 `system/external-secrets/ghcr-pull-secret.yaml`이 라벨 `square-kr.io/ghcr-pull-secret: "true"`가 붙은 네임스페이스에 만든다.
+- PostgreSQL 관리자 `square_admin`의 비밀번호는 노트북 macOS 키체인 서비스 `squarek8s-postgresql`에만 있다.
 
-- 클러스터는 OCI에 있지만 External Secrets backend는 AWS SSM Parameter Store다.
-- 단일 `ClusterSecretStore` `aws-ssm`을 사용하며 자격 증명은 `external-secrets/aws-ssm-credentials`에 둔다.
-- 서비스 시크릿은 `/{env}/{service}/{KEY}` 패턴을 사용한다.
-- 인프라 시크릿은 `/infrastructure/...` 경로를 사용한다.
-- 사용 중인 인프라 경로는 GHCR, Cloudflare, Datadog이다. `/infrastructure/datadog/postgresql-password`는 클러스터가 가져가지 않고 DB 호스트 Agent를 설정할 때만 쓴다.
-- `/infrastructure/postgresql/`와 `MAIN_IP`는 사용하지 않는다.
-- GHCR pull secret은 `system/external-secrets/ghcr-pull-secret.yaml`에서 공용으로 만든다.
-- YAML, Terraform, 문서에 비밀번호·토큰·개인 키를 하드코딩하지 않는다.
+### 애플리케이션 배포
 
-### 애플리케이션 배포 규칙
+- 서비스 워크로드는 공통 chart의 Argo `Rollout`(blue-green)으로 배포한다. 서비스 차이는 `projects/{service}/{env}/values.yaml`에서 오버라이드한다.
+- Reloader는 `annotations` 전략, `syncAfterRestart: false`로 둔다. `true`면 Reloader가 재시작할 때마다 모든 Rollout이 다시 배포된다.
+- 서비스 규칙과 새 서비스 체크리스트는 [projects/AGENTS.md](projects/AGENTS.md)에 있다.
 
-- 서비스 워크로드는 `Deployment` 대신 공통 chart의 Argo `Rollout`을 사용한다.
-- 서비스 차이는 `projects/{service}/{env}/values.yaml`에서 오버라이드한다.
-- 서비스별 환경 폴더에는 보통 `values.yaml`, `external-secret.yaml`만 두고 필요할 때만 매니페스트를 추가한다.
-- 현재 서비스는 `notification-backend/dev`, `honami/prod`다.
-- ApplicationSet의 `ignoreDifferences`와 `RespectIgnoreDifferences=true`는 Argo Rollouts가 Service에 붙이는 `rollouts-pod-template-hash` 셀렉터와 Reloader의 `last-reloaded-from` 어노테이션을 selfHeal이 지우지 않게 한다. 빠지면 blue-green 전환이 깨지고 시크릿 변경 후 자동 재시작이 되돌려진다.
-- Reloader는 `annotations` 전략과 `syncAfterRestart: false`로 둔다. `true`면 Reloader가 재시작할 때마다 모든 Rollout이 다시 배포된다.
+## 불변 조건
 
-## POSTGRESQL AND TAILSCALE
+바꾸면 장애로 이어지는 값과 설정이다.
 
-- PostgreSQL 16은 Bastion 인스턴스에서 실행하며 `10.20.0.45:5432`를 사용한다.
-- 애플리케이션 DB/역할은 `square_notification` / `notification_backend`다.
-- Datadog 역할은 `square_datadog`이며 superuser가 아니다.
-- 노트북용 원격 관리자 역할은 `square_admin`이다. 비밀번호는 저장소나 SSM이 아니라 로컬 macOS 키체인의 서비스 `squarek8s-postgresql`에 저장되어 있다.
-- Tailscale 호스트 이름은 `squarek8s-db-router`, MagicDNS 이름은 `db-router-01`이다. `10.20.0.0/16`을 subnet route로 광고하며 승인된 상태다.
-- 서버는 IPv4/IPv6 forwarding이 활성화되어 있고 PostgreSQL은 Tailscale CGNAT 대역 `100.64.0.0/10`에 TLS + SCRAM 접속을 허용한다.
-- Terraform은 PostgreSQL 설치, 역할, 데이터, Tailscale, Datadog 호스트 Agent를 구성하지 않는다. Bastion을 재생성하면 `docs/postgresql.md` 절차 전체를 다시 수행한다.
-- Bastion `source_details[0].source_id`는 `ignore_changes`다. Ubuntu 이미지 data source가 최신 이미지를 가리켜도 부트 볼륨이 교체되지 않게 하기 위함이므로 제거하지 않는다.
+- PostgreSQL 주소 `10.20.0.45:5432`는 Terraform에 고정되어 있다. 공인 5432는 열지 않고 원격 관리는 Tailscale subnet route `10.20.0.0/16`(호스트 `squarek8s-db-router`, MagicDNS `db-router-01`)을 쓴다.
+- Bastion `source_details[0].source_id`의 `ignore_changes`를 유지한다. 빼면 부트 볼륨이 교체되어 PostgreSQL, Tailscale, Datadog 호스트 Agent 설치가 사라진다.
+- Envoy LB에는 Terraform의 `squarek8s-envoy-lb-nsg`를 붙이고, NSG는 Cloudflare IPv4 대역의 TCP 80/443만 허용한다. Envoy Service의 `oci.oraclecloud.com/security-rule-management-mode: "None"`을 유지해 Cloud Controller가 security list에 `0.0.0.0/0` 규칙을 만들지 않게 한다. Public subnet security list에는 공개 80/443 규칙을 두지 않는다.
+- Envoy Service는 `externalTrafficPolicy: Local`이다. 프록시가 없는 노드는 LB에서 빠지므로 EnvoyProxy의 노드별 분산과 PDB를 유지한다.
+- Datadog node Agent는 `spc_t` SELinux 타입으로 실행한다. 빼면 워커의 setroubleshootd가 거부 기록을 분석하느라 1 vCPU를 대부분 쓴다.
+- `terraform/worker-init.sh`의 OKE 초기화 부분을 유지한다. 빼면 새 노드가 클러스터에 조인하지 못한다.
+- ApplicationSet의 `ignoreDifferences`와 `RespectIgnoreDifferences=true`를 유지한다.
 
-```bash
-# 노트북에서 PostgreSQL 관리자 비밀번호 조회
-security find-generic-password -a square_admin -s squarek8s-postgresql -w
+## 코드 작성 규칙
 
-# Tailscale을 통한 PostgreSQL 연결 확인
-nc -vz 10.20.0.45 5432
+- 주석은 코드만으로 알 수 없는 이유나 제약에만 한국어로 쓴다. 코드를 다시 말하는 주석, 변경 이력, 작업 상태는 쓰지 않는다.
+- 비밀번호, 토큰, 개인 키를 YAML, Terraform, 스크립트, 문서에 넣지 않는다. ExternalSecret + SSM 또는 로컬 키체인을 쓴다.
+- 외부 Helm chart와 Git source는 `targetRevision`을 정확한 버전으로 고정한다. 이 저장소를 가리키는 source만 `HEAD`를 쓴다.
+- 셸 스크립트는 bash로 쓰고 `set -euo pipefail`을 켜며 `shellcheck -S warning`을 통과해야 한다. `worker-init.sh`는 OKE 초기화 부분이 실패를 직접 처리하므로 `set -euo pipefail`을 그 뒤에 둔다.
+- Terraform은 `terraform fmt`를 지키고, 기존 state로 `plan`을 확인한 뒤 apply한다.
+- 매니페스트나 chart를 고치면 `scripts/validate-manifests.sh`를 실행한다(`helm`, `kubeconform` 필요). 같은 검사가 push·PR마다 `validate` 워크플로로 돈다.
+- 커밋 메시지는 `type: 영어 소문자 요약` 형식이다. type은 `feat`, `fix`, `refactor`, `chore`, `docs`, `ci`를 쓰고, 봇 커밋은 `chore(bot):`을 쓴다.
 
-# 서버의 Tailscale 상태 확인
-ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_public_ip) \
-  'sudo tailscale status'
-```
+## 문서 작성 규칙
 
-## DATADOG POSTGRESQL DBM
+- 문서는 한국어로 쓰고 [문서 안내](docs/README.md)의 종류별 템플릿과 작성 규칙을 따른다.
+- 현재 값은 README "현재 구성"과 PostgreSQL 런북 "적용 구성"에만 쓰고 다른 곳은 링크한다.
+- 기록은 그날의 사실만 담는다. 남은 일은 `docs/backlog.md`에 등록한다.
 
-- Datadog site는 `us5.datadoghq.com`이며 클러스터 Agent는 APM, 전체 컨테이너 로그, OTEL collector를 수집한다.
-- PostgreSQL 체크와 DBM은 클러스터가 아니라 PostgreSQL 호스트(`10.20.0.45`)의 Datadog Agent 7이 `127.0.0.1:5432`로 수집한다. 호스트 이름은 `squarek8s-postgresql`이고 CPU·메모리·디스크 지표도 같은 Agent가 보낸다. APM은 꺼져 있다.
-- 대상 DB는 `database_autodiscovery`의 include 목록인 `square_notification`, `honami`다. DB를 추가하면 그 DB에 `datadog` 스키마와 `explain_statement` 함수를 만들고 include에 넣는다.
-- relation, bloat, WAL, checksum metrics와 DBM이 활성화되어 있다.
-- 설정 파일은 호스트의 `/etc/datadog-agent/conf.d/postgres.d/conf.yaml`(dd-agent 소유, 0600)이며 비밀번호는 `/infrastructure/datadog/postgresql-password`와 같은 값이다.
-- Terraform과 GitOps 밖의 수동 구성이므로 Bastion 재생성 시 `docs/postgresql.md`의 Datadog 호스트 Agent 절차를 다시 수행한다.
-- 클러스터의 node Agent는 `spc_t` SELinux 타입으로 실행한다.
+## 함께 바꿀 것
 
-## NETWORK SECURITY
-
-- Public subnet security list는 Bastion, OKE public endpoint, Envoy LoadBalancer subnet이 공유하지만 공개 80/443 규칙은 두지 않는다.
-- Envoy LoadBalancer에는 Terraform의 `squarek8s-envoy-lb-nsg`를 연결하고 Cloudflare 공식 IPv4 대역에서 오는 TCP 80/443만 허용한다.
-- Envoy Service의 `oci.oraclecloud.com/security-rule-management-mode`는 `None`이다. OCI Cloud Controller가 security list에 `0.0.0.0/0` 규칙을 다시 만들지 않게 유지한다.
-- Cloudflare IP 대역이 변경되면 `terraform/main.tf`의 `cloudflare_ipv4_cidrs`를 갱신한 뒤 apply한다.
-- PostgreSQL 호스트는 로컬 방화벽으로 공인 5432를 차단하며 원격 관리는 Tailscale의 `10.20.0.0/16` route를 사용한다.
+| 바꾸는 것 | 함께 바꿀 곳 |
+|---|---|
+| OKE 버전·노드 이미지 | `terraform/main.tf`의 `kubernetes_version`, `oke_image_name`, README "현재 구성". [런북](docs/runbooks/oke-upgrade.md) 절차를 따른다 |
+| Envoy LB NSG 재생성 | `terraform output -raw envoy_lb_nsg_id` 값을 `networking/gateway/envoy.yaml`에 반영 |
+| Cloudflare IP 대역 | `terraform/main.tf`의 `cloudflare_ipv4_cidrs` 후 apply |
+| 새 도메인 | `networking/gateway/gateway.yaml` listener, Cloudflare proxied 레코드, README |
+| Envoy Gateway 차트 버전 | `crds.enabled: false`라 `gateway.envoyproxy.io` CRD를 ArgoCD가 관리하지 않는다. 같은 버전의 CRD를 먼저 수동 적용한다 |
+| Gateway API 버전 | `system/gateway-api-crds/application.yaml`. Envoy Gateway가 지원하는 버전인지 확인한다 |
+| ArgoCD 설정 | `bootstrap/argocd/values.yaml` 수정 후 `helm diff`로 확인하고 `helmfile apply`. ArgoCD는 스스로를 관리하지 않는다 |
+| 서비스 DB 추가 | PostgreSQL 런북의 서비스 DB 추가 절차: SSM, Datadog `include`, `datadog` 스키마, "적용 구성" 표 |
+| 서비스·환경 추가 | [projects/AGENTS.md](projects/AGENTS.md) 체크리스트 |
+| Bastion 재생성 | PostgreSQL 런북 전체를 다시 수행. 공인 IP가 바뀔 수 있다 |
+| Envoy LB 재생성 | 공인 IP가 바뀔 수 있으므로 Cloudflare 레코드 갱신 |
 
 ## ANTI-PATTERNS
 
-| 피해야 할 것 | 대신 해야 할 것 |
+| 피해야 할 것 | 대신 할 것 |
 |---|---|
 | 빈 Terraform state로 기존 인프라 apply | 기존 OCI Object Storage backend 연결 확인 |
-| 백업 없이 `terraform destroy` | PostgreSQL dump와 Block Volume 영향을 먼저 확인 |
-| YAML에 시크릿 하드코딩 | ExternalSecret + AWS SSM 또는 로컬 키체인 사용 |
-| 서비스 하나 때문에 `charts/app/` 직접 수정 | 먼저 `values.yaml` 오버라이드 확인 |
-| 서비스별 pull secret 복제 | 공용 `ghcr-pull-secret` 재사용 |
-| 루트에서 `application.yaml` 직접 추가 | 도메인별 `_application.yaml` 아래에 연결 |
-| 서비스에 `Deployment` 사용 | 공통 chart의 `Rollout` 유지 |
-| 운영 리소스를 `kubectl edit`로 상시 수정 | Git 변경 후 ArgoCD sync |
-| 공인 IP로 PostgreSQL 5432 개방 | Tailscale route 사용 |
-| Envoy Service의 NSG annotation 제거 | Cloud Controller가 공개 security list 규칙을 다시 만들 수 있으므로 NSG와 `None` 모드 유지 |
-| Bastion의 이미지 `ignore_changes` 제거 | 부트 볼륨 교체로 PostgreSQL 설치가 사라지므로 유지 |
-| Datadog node Agent의 `spc_t` SELinux 설정 제거 | 워커의 setroubleshootd가 거부 기록을 분석하느라 1 vCPU를 대부분 소모하므로 유지 |
-| 서비스에 `kustomization.yaml` 추가 | 이미지 갱신 워크플로우는 `values.yaml`의 `image.version`만 수정한다 |
-| `worker-init.sh`에서 OKE 초기화 부분 제거 | 노드가 클러스터에 조인하지 못하므로 유지 |
+| 백업 없이 `terraform destroy` | PostgreSQL `pg_dump`와 Block Volume 영향을 먼저 확인 |
+| 서비스 하나 때문에 `charts/app` 수정 | `values.yaml` 오버라이드 |
+| 서비스에 `Deployment`나 `kustomization.yaml` 추가 | 공통 chart의 `Rollout`. 이미지 워크플로는 `values.yaml`의 `image.version`만 고친다 |
+| 서비스별 pull secret 복제 | 공용 `ghcr-pull-secret` |
+| 루트에 `application.yaml` 직접 추가 | 도메인별 `_application.yaml` 아래에 둔다 |
+| 운영 리소스를 `kubectl edit`·수동 생성으로 상시 수정 | Git 변경 후 ArgoCD sync. 작업 중 임시로 만든 리소스는 작업이 끝나면 지우고 기록에 남긴다 |
 
 ## USEFUL COMMANDS
 
 ```bash
-# 기존 OCI state로 인프라 확인
-cd terraform
-terraform init -backend-config=backend.hcl
-terraform plan
-
-# kubeconfig
 export KUBECONFIG=~/.kube/oke-squarek8s
-kubectl get nodes
-
-# 새 클러스터 GitOps 부트스트랩
-export AWS_ACCESS_KEY_ID=...
-export AWS_SECRET_ACCESS_KEY=...
-./bootstrap.sh
-
-# ArgoCD 상태와 UI
 kubectl -n argocd get applications
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
-
-# 특정 ArgoCD 앱 sync
 kubectl -n argocd patch app <app-name> -p '{"operation":{"sync":{}}}' --type merge
 
-# Gateway와 Envoy LB 주소
-kubectl get gateway -n infra
+cd terraform && terraform init -backend-config=backend.hcl && terraform plan
 
-# PostgreSQL 서버 접속
 ssh -i ~/.ssh/squarek8s ubuntu@$(cd terraform && terraform output -raw bastion_public_ip)
 
-# GHCR 정리 스크립트 테스트
+scripts/validate-manifests.sh
 scripts/test-cleanup-ghcr.sh
 ```
-
-## REMINDERS
-
-- 문서 언어는 한국어로 유지한다.
-- 현재 kubeconfig는 `~/.kube/oke-squarek8s` 하나를 기준으로 사용한다.
-- `helmfile diff`에는 `helm-diff` 플러그인이 필요하다.
-- Cloudflare는 `sqr.kr`, `*.sqr.kr`을 Envoy LoadBalancer 공인 IP로 proxied 처리한다.
-- Envoy LoadBalancer나 Bastion을 재생성하면 공인 IP가 바뀔 수 있다. DB private IP `10.20.0.45`는 Terraform에 고정되어 있다.
-- PostgreSQL은 Block Volume 백업 정책으로 매일 백업한다. 논리 백업(`pg_dump`), PITR, HA는 구성하지 않았다. 복원 절차는 `docs/postgresql.md` 참고.
-- Envoy NSG OCID는 `networking/gateway/envoy.yaml`에 직접 들어 있다. NSG를 재생성하면 `terraform output -raw envoy_lb_nsg_id` 값으로 갱신한다.
-- OKE 버전을 올리면 `projects/*/applicationset.yaml`의 Pod Security `*-version` 라벨도 함께 올린다.
-- 워커 `/var/log/messages` 보존 정책은 `terraform/worker-init.sh`가 설치한다. 신규 노드는 node pool user_data로 받고, 실행 중인 노드는 `sudo bash -s -- --logs-only < terraform/worker-init.sh`로 적용한다. Datadog SELinux 진단 로그 폭증은 node Agent를 `spc_t`로 실행해 없앴다. 디스크 경보는 아직 구성하지 않았다. `docs/incidents/2026-09-10-disk-pressure.md` 참고.
-- `prod` 네임스페이스는 현재 워크로드 없이 `ghcr-pull-secret`만 있다.
