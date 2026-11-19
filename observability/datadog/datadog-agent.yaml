@@ -26,6 +26,9 @@ spec:
       containerCollectAll: true
     processDiscovery:
       enabled: false
+    # Agent 7.78부터 기본으로 켜지고 system-probe 컨테이너가 추가된다. 1 OCPU 워커의 CPU 여유가 적어 끈다.
+    serviceDiscovery:
+      enabled: false
     otelCollector:
       enabled: true
 
