@@ -20,7 +20,7 @@ spec:
     apm:
       enabled: true
     clusterChecks:
-      enabled: true
+      enabled: false
     logCollection:
       enabled: true
       containerCollectAll: true

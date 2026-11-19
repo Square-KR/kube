@@ -15,6 +15,10 @@ spec:
     chart: argo-rollouts
     repoURL: https://argoproj.github.io/argo-helm
     targetRevision: 2.40.5
+    helm:
+      valuesObject:
+        controller:
+          replicas: 1
 
   destination:
     server: https://kubernetes.default.svc
