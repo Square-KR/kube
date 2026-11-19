@@ -9,7 +9,7 @@ OCI OKE와 ArgoCD App-of-Apps로 운영하는 Kubernetes GitOps 저장소다. �
 | 구성 | 사양 |
 |---|---|
 | 리전 | OCI `ap-seoul-1`, AWS SSM은 `ap-northeast-2` |
-| OKE | Basic Cluster, Kubernetes `v1.36.4`, Flannel Overlay |
+| OKE | Basic Cluster, Kubernetes `v1.37.1`, Flannel Overlay |
 | 워커 | `VM.Standard.A1.Flex` 2대, 각 1 OCPU / 8 GiB / 50 GB (루트 파일시스템 약 30 GiB) |
 | 네트워크 | VCN `10.20.0.0/16`, public subnet `10.20.0.0/24`, worker subnet `10.20.1.0/24`, Pod `10.244.0.0/16`, Service `10.96.0.0/16` |
 | Bastion + PostgreSQL | `VM.Standard.A1.Flex` 1대, 2 OCPU / 8 GiB / 부트 50 GB, `10.20.0.45`, PostgreSQL 16 |
