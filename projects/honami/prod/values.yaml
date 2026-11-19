@@ -1,5 +1,5 @@
 port: 3000
-# Never above 1: the school-account collector and rate limits live in process memory.
+# 학교 계정 수집기와 rate limit 상태가 프로세스 메모리에 있으므로 1을 넘기지 않는다.
 replicas: 1
 healthCheck:
   liveness: /api/health
@@ -14,7 +14,7 @@ resources:
 env:
   - name: PORT
     value: "3000"
-  # Kubernetes sets HOSTNAME to the pod name; the Next.js standalone server binds to it.
+  # Kubernetes가 HOSTNAME을 파드 이름으로 채우는데 Next.js standalone 서버가 이 값에 바인딩한다.
   - name: HOSTNAME
     value: "0.0.0.0"
   - name: BETTER_AUTH_URL

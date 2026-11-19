@@ -22,7 +22,6 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 1. Install ArgoCD
 log "Installing ArgoCD..."
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 helmfile apply --file "$SCRIPT_DIR/bootstrap/argocd/helmfile.yaml" --quiet
@@ -30,7 +29,6 @@ helmfile apply --file "$SCRIPT_DIR/bootstrap/argocd/helmfile.yaml" --quiet
 log "Waiting for ArgoCD to be ready..."
 kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
 
-# 2. Create AWS SSM credentials secret
 log "Creating AWS SSM credentials secret..."
 kubectl create namespace external-secrets --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic aws-ssm-credentials \
@@ -39,7 +37,6 @@ kubectl create secret generic aws-ssm-credentials \
   --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# 3. Apply root application
 log "Applying root application..."
 kubectl apply -f "$SCRIPT_DIR/root.yaml"
 
