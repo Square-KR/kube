@@ -7,7 +7,6 @@
 | 높음 | 시스템 파드 resource requests | `kube-system`을 제외한 시스템 컨테이너 대부분이 requests 없이 BestEffort로 실행된다. 스케줄러가 노드 여유를 판단하지 못해 한 노드에 몰릴 수 있다. 11-19 kubelet 무응답의 배경이다 | [정리 기록](incidents/2026-11-19-repo-and-cluster-cleanup.md) |
 | 높음 | 노드 CPU·디스크 경보 | Datadog 모니터: 루트 파일시스템 70% 15분 경고·80% 5분 심각, `DiskPressure=True` 1분, ArgoCD repo-server Ready 0. Datadog UI에서 직접 구성한다 | [DiskPressure 기록](incidents/2026-09-10-disk-pressure.md) |
 | 중간 | PostgreSQL 볼륨 복원 시험 | 첫 정기 백업은 2026-11-19 03:00 KST에 생성됐다. [런북](runbooks/postgresql.md#백업과-복원)의 볼륨 복원 절차는 한 번도 수행하지 않았다 | [2026-11-19 기록](incidents/2026-11-19-gitops-drift-and-node-cpu.md) |
-| 중간 | square-user-api 최초 배포 | `/dev/square-user-api/` SSM 값과 전용 DB·역할을 준비하고 `projects/square-user-api`를 커밋한다. migration 성공 뒤 image tag와 replicas를 바꾼다 | square-user 저장소 `docs/operations.md` |
 | 중간 | DB 호스트 Datadog 태그 | 호스트 Agent의 `env:dev` 태그가 prod `honami` DB 지표에도 붙는다 | [2026-11-19 기록](incidents/2026-11-19-gitops-drift-and-node-cpu.md) |
 | 중간 | OCI 보안 목록 잔여 규칙 | Cloud Controller가 예전에 추가한 NodePort 규칙(worker ingress 3건, public egress 3건)이 남아 있다. `terraform/main.tf`의 `ignore_changes`를 빼고 plan으로 삭제 범위를 확인한 뒤 정리한다 | [정리 기록](incidents/2026-11-19-repo-and-cluster-cleanup.md) |
 | 낮음 | SELinux 모드 불일치 | 워커의 `/etc/selinux/config`는 `enforcing`인데 런타임은 `Permissive`다. Enforcing 전환은 hostPath를 쓰는 모든 워크로드를 검증한 뒤에 한다 | [DiskPressure 기록](incidents/2026-09-10-disk-pressure.md) |

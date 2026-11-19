@@ -10,7 +10,6 @@
 |---|---|---|---|---|
 | `notification-backend` | `dev` | `dev` | 없음 (클러스터 내부 `notification-backend.dev.svc.cluster.local`) | |
 | `honami` | `prod` | `prod` | `mllm.kr` | replicas 1 고정 |
-| `square-user-api` | `dev` | `dev` | `id-api-dev.sqr.kr` (`/api/`, `/.well-known/`) | 커밋 전. SSM·DB 준비 후 배포 |
 
 ## FILES
 

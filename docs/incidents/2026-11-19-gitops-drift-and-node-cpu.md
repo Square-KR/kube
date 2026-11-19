@@ -77,4 +77,4 @@ SSM 값을 바꿔도 파드가 자동으로 재시작되지 않아 원인을 찾
 - `kube-system`에 남은 예전 사본(Secret 5개, ConfigMap `reloader-meta-info`, Lease `argo-rollouts-controller-lock`) 삭제: 같은 날 완료 확인.
 - 볼륨 백업 생성 확인: 첫 정기 백업이 2026-11-19 03:00 KST에 생성됨.
 - Envoy 프록시 단일 노드 문제: 같은 날 `8b15afe`로 노드마다 하나씩 두도록 변경([정리 기록](2026-11-19-repo-and-cluster-cleanup.md)).
-- [backlog](../backlog.md): 노드 CPU·디스크 경보, PostgreSQL 볼륨 복원 시험, square-user-api 최초 배포, DB 호스트 Datadog 태그, 보안 권장 사항(ArgoCD admin 계정, ClusterSecretStore 범위, Gateway route 허용 범위, GitHub Actions 고정, AppProject 분리).
+- [backlog](../backlog.md): 노드 CPU·디스크 경보, PostgreSQL 볼륨 복원 시험, DB 호스트 Datadog 태그, 보안 권장 사항(ArgoCD admin 계정, ClusterSecretStore 범위, Gateway route 허용 범위, GitHub Actions 고정, AppProject 분리).
