@@ -10,3 +10,9 @@ configs:
         - .spec.dataFrom[].find | .conversionStrategy, .decodingStrategy
   params:
     server.insecure: true
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
