@@ -7,8 +7,7 @@ for cmd in helm kubeconform; do
 done
 
 crd_schemas='https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
-# CRDs-catalog에 없는 CRD 버전이 있어 스키마가 없는 리소스는 건너뛴다.
-kubeconform_args=(-strict -summary -ignore-missing-schemas -schema-location default -schema-location "$crd_schemas")
+kubeconform_args=(-strict -summary -schema-location default -schema-location "$crd_schemas")
 
 helm lint charts/app
 
