@@ -17,6 +17,9 @@ spec:
         - path:
             type: PathPrefix
             value: /
+      # Envoy Gateway 기본 요청 타임아웃 15초가 ArgoCD UI의 watch 스트림과 로그 follow를 끊어 504가 반복된다.
+      timeouts:
+        request: 0s
       backendRefs:
         - group: ""
           kind: Service
