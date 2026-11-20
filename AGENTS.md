@@ -131,6 +131,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE,
 | 서비스 DB 추가 | PostgreSQL 런북의 서비스 DB 추가 절차: SSM, Datadog `include`, `datadog` 스키마, "적용 구성" 표 |
 | 서비스·환경 추가 | [projects/AGENTS.md](projects/AGENTS.md) 체크리스트 |
 | Bastion 재생성 | PostgreSQL 런북 전체를 다시 수행. 공인 IP가 바뀔 수 있다 |
+| 워커 노드 교체 | 새 노드 부트 볼륨은 VPU 10이다. [OKE 업그레이드 런북](docs/runbooks/oke-upgrade.md) 4단계대로 CLI로 120으로 올린다 |
 | Envoy LB 재생성 | 공인 IP가 바뀔 수 있으므로 Cloudflare 레코드 갱신 |
 
 ## ANTI-PATTERNS

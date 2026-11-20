@@ -342,6 +342,7 @@ resource "oci_core_instance" "bastion" {
     ssh_authorized_keys = file(pathexpand(var.ssh_public_key_path))
   }
 
+  # 부트 볼륨 VPU는 OCI CLI로 관리한다. boot_volume_vpus_per_gb를 바꾸면 인스턴스가 교체된다.
   source_details {
     boot_volume_size_in_gbs = 50
     source_id               = data.oci_core_images.bastion.images[0].id
@@ -360,7 +361,7 @@ resource "oci_core_volume" "postgres" {
   display_name        = "squarek8s-postgres-data"
   freeform_tags       = local.tags
   size_in_gbs         = 50
-  vpus_per_gb         = 10
+  vpus_per_gb         = 120
 }
 
 resource "oci_core_volume_attachment" "postgres" {

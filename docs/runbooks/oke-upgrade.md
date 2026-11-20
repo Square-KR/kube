@@ -73,6 +73,17 @@ node pool 설정 변경은 새로 만드는 노드에만 적용되고 기존 노
    ```
 
 4. `main.tf`의 `size`를 2로 되돌리고 plan이 "No changes"인지 확인한다.
+5. 새 노드의 부트 볼륨은 VPU 10으로 만들어진다. node pool에는 VPU 설정이 없으므로 CLI로 120으로 올린다. 볼륨이 연결된 채로 바뀐다.
+
+   ```bash
+   C=$(sed -n 's/^compartment_id *= *"\(.*\)"/\1/p' terraform.tfvars)
+   oci bv boot-volume list --profile k8s-tf --compartment-id "$C" --availability-domain "kNcC:AP-SEOUL-1-AD-1" --all \
+     --query 'data[?"lifecycle-state"==`"AVAILABLE"` && "vpus-per-gb"!=`120`].id' --raw-output \
+     | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin)))' \
+     | while read -r BV; do
+         oci bv boot-volume update --profile k8s-tf --boot-volume-id "$BV" --vpus-per-gb 120 --force --wait-for-state AVAILABLE
+       done
+   ```
 
 2026-10-09에는 첫 drain이 15분 eviction timeout으로 실패했다. 강제로 종료하지 않고 새 워커와 운영 파드가 정상임을 확인한 뒤 기존 노드를 재부팅해 진행했다.
 
