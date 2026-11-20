@@ -8,7 +8,8 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE,
 
 ```text
 .
-├── .github/workflows/  # validate(매니페스트·스크립트 검증), deploy-image(이미지 태그 갱신), cleanup-ghcr(GHCR 정리)
+├── .github/            # PR 템플릿, CODEOWNERS
+│   └── workflows/      # validate(매니페스트·스크립트 검증), deploy-image(이미지 태그 갱신), cleanup-ghcr(GHCR 정리)
 ├── terraform/          # OCI VCN, OKE, 워커(worker-init.sh user_data), Bastion/DB, Block Volume과 백업 정책
 ├── bootstrap/          # ArgoCD Helmfile. GitOps 밖에서 수동 적용
 ├── system/             # Gateway API CRD, cert-manager, Envoy Gateway, External Secrets, Argo Rollouts, Reloader
@@ -110,6 +111,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE,
 - Terraform은 `terraform fmt`를 지키고, 기존 state로 `plan`을 확인한 뒤 apply한다.
 - 매니페스트나 chart를 고치면 `scripts/validate-manifests.sh`를 실행한다(`helm`, `kubeconform` 필요). 같은 검사가 push·PR마다 `validate` 워크플로로 돈다.
 - 커밋 메시지는 `type: 영어 소문자 요약` 형식이다. type은 `feat`, `fix`, `refactor`, `chore`, `docs`, `ci`를 쓰고, 봇 커밋은 `chore(bot):`을 쓴다.
+- PR 본문은 [PR 템플릿](.github/pull_request_template.md)의 절 순서대로 쓰고 해당하지 않는 절과 항목은 지운다. 제목은 커밋 메시지와 같은 형식이다. squash merge 커밋 제목이 된다.
 
 ## 문서 작성 규칙
 
