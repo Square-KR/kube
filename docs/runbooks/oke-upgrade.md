@@ -76,6 +76,8 @@ node pool 설정 변경은 새로 만드는 노드에만 적용되고 기존 노
 
 2026-10-09에는 첫 drain이 15분 eviction timeout으로 실패했다. 강제로 종료하지 않고 새 워커와 운영 파드가 정상임을 확인한 뒤 기존 노드를 재부팅해 진행했다.
 
+삭제한 노드는 Datadog 모니터 "호스트 또는 Agent 통신 중단"과 "노드 NotReady"에 Alert·Warn 그룹으로 남는다. 노드 교체가 끝나면 두 모니터에서 삭제한 노드의 그룹을 Resolve한다.
+
 drain 중 External Secrets webhook이 옮겨가는 동안 `external-secrets` 앱이 Server-Side Diff의 webhook 호출 실패로 `Unknown`이 될 수 있다. webhook이 Ready가 된 뒤 hard refresh하면 돌아온다.
 
 ### 5. 문서 갱신

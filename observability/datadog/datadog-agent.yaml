@@ -45,5 +45,8 @@ spec:
       env:
         - name: DD_IGNORE_AUTOCONF
           value: "kubernetes_state redisdb"
+        # OKE 관리 컴포넌트의 info 로그(CoreDNS 쿼리 로그, observability discovery agent)가 전체 로그의 약 77%다.
+        - name: DD_CONTAINER_EXCLUDE_LOGS
+          value: "name:^coredns$ name:^discovery-agent$"
       tolerations:
         - operator: Exists
