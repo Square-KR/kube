@@ -10,6 +10,9 @@ configs:
         - .spec.dataFrom[].find | .conversionStrategy, .decodingStrategy
   params:
     server.insecure: true
+    # info 로그는 reconcile마다 남아 Datadog 로그의 약 17%를 차지한다.
+    controller.log.level: warn
+    reposerver.log.level: warn
 
 dex:
   enabled: false
