@@ -2,6 +2,7 @@
 제목은 커밋 규칙과 같은 `type: 영어 소문자 요약`으로 쓴다. squash merge 커밋 제목이 된다.
 type: feat, fix, refactor, chore, docs, ci
 해당하지 않는 절과 항목은 지운다.
+본문은 존댓말로, 결론부터 짧은 문장으로 쓴다.
 -->
 
 ## 📌 배경

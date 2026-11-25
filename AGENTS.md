@@ -112,6 +112,7 @@ Square-KR의 OCI 기반 Kubernetes GitOps 저장소다. Terraform으로 OCI OKE,
 - 매니페스트나 chart를 고치면 `scripts/validate-manifests.sh`를 실행한다(`helm`, `kubeconform` 필요). 같은 검사가 push·PR마다 `validate` 워크플로로 돈다.
 - 커밋 메시지는 `type: 영어 소문자 요약` 형식이다. type은 `feat`, `fix`, `refactor`, `chore`, `docs`, `ci`를 쓰고, 봇 커밋은 `chore(bot):`을 쓴다.
 - PR 본문은 [PR 템플릿](.github/pull_request_template.md)의 절 순서대로 쓰고 해당하지 않는 절과 항목은 지운다. 제목은 커밋 메시지와 같은 형식이다. squash merge 커밋 제목이 된다.
+- PR 본문은 리뷰어가 읽는 글이므로 존댓말로 쓴다. 결론을 먼저 쓰고, 한 문장에 한 가지 내용만 담는다. 나열할 내용은 목록으로, 로그와 명령은 코드 블록으로 나눈다. 수치는 기간과 출처를 함께 쓰고, 처음 읽는 사람이 모를 용어는 풀어 쓴다.
 
 ## 문서 작성 규칙
 
