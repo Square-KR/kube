@@ -48,5 +48,8 @@ spec:
         # OKE 관리 컴포넌트의 info 로그(CoreDNS 쿼리 로그, observability discovery agent)가 전체 로그의 약 77%다.
         - name: DD_CONTAINER_EXCLUDE_LOGS
           value: "name:^coredns$ name:^discovery-agent$"
+        # operator 1.31.2는 serviceDiscovery를 꺼도 Agent 기본값(discovery.enabled: true)을 덮어쓰지 않는다. Agent가 없는 system-probe 소켓을 계속 호출해 error 로그를 남긴다.
+        - name: DD_DISCOVERY_ENABLED
+          value: "false"
       tolerations:
         - operator: Exists
