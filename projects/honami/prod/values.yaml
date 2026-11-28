@@ -6,7 +6,7 @@ healthCheck:
   timeoutSeconds: 3
 image:
   name: ghcr.io/square-kr/honami
-  version: "a998c1c6"
+  version: "2283c2a2"
 resources:
   cpu: "100m"
   memory: "512Mi"
